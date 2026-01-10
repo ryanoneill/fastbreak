@@ -1,0 +1,45 @@
+[package]
+name = "fastbreak"
+version = "0.1.0"
+edition = "2024"
+authors = ["Ryan O'Neill"]
+description = "A formal methods-inspired specification language for documenting requirements"
+license = "MIT"
+repository = "https://github.com/ryanoneill/fastbreak"
+keywords = ["specification", "formal-methods", "documentation"]
+categories = ["development-tools", "command-line-utilities"]
+
+[[bin]]
+name = "fb"
+path = "src/main.rs"
+
+[lib]
+name = "fastbreak"
+path = "src/lib.rs"
+
+[dependencies]
+# Lexer
+logos = "0.15"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Error handling
+thiserror = "2"
+miette = { version = "7", features = ["fancy"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+# Data structures
+indexmap = { version = "2", features = ["serde"] }
+smol_str = "0.3"
+
+[dev-dependencies]
+insta = { version = "1", features = ["yaml"] }
+pretty_assertions = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
