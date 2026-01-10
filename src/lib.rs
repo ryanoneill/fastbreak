@@ -41,6 +41,7 @@
 
 pub mod ast;
 pub mod lexer;
+pub mod parser;
 
 /// Source location information for error reporting
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
@@ -81,5 +82,11 @@ impl From<logos::Span> for Span {
             start: span.start,
             end: span.end,
         }
+    }
+}
+
+impl From<Span> for miette::SourceSpan {
+    fn from(span: Span) -> Self {
+        (span.start, span.end.saturating_sub(span.start)).into()
     }
 }

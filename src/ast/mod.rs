@@ -10,13 +10,16 @@ mod scenario;
 mod state;
 mod types;
 
-pub use expr::{BinaryOp, Expr, ExprKind, Literal, Pattern, PatternKind, UnaryOp};
+pub use expr::{
+    BinaryOp, Expr, ExprKind, FieldInit, FieldPattern, LambdaParam, Literal, MatchArm, Pattern,
+    PatternKind, QuantBinding, UnaryOp,
+};
 pub use property::{Property, TemporalOp};
-pub use scenario::{GivenClause, Scenario, ThenClause, WhenClause};
-pub use state::{Action, Contract, ContractKind, Invariant, StateBlock, StateField};
+pub use scenario::{Assertion, Binding, GivenClause, Scenario, ThenClause, WhenClause};
+pub use state::{Action, ActionParam, Contract, ContractKind, Invariant, StateBlock, StateField};
 pub use types::{
-    EnumDef, EnumVariant, Field, GenericArg, Import, ImportItem, Module, Relation,
-    RelationConstraint, TypeDef, TypeRef,
+    BuiltInType, EnumDef, EnumVariant, Field, GenericArg, Import, ImportItem, Module, Relation,
+    RelationConstraint, TypeDef, TypeRef, TypeRefKind,
 };
 
 use crate::Span;
