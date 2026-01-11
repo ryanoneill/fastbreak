@@ -25,6 +25,7 @@ use smol_str::SmolStr;
 use std::sync::Arc;
 
 /// Semantic analyzer for Fastbreak specifications
+#[derive(Debug)]
 pub struct Analyzer {
     /// Symbol table
     pub symbols: SymbolTable,
@@ -71,6 +72,18 @@ impl Analyzer {
     #[must_use]
     pub fn succeeded(&self) -> bool {
         !self.diagnostics.has_errors()
+    }
+
+    /// Check if there are any errors
+    #[must_use]
+    pub fn has_errors(&self) -> bool {
+        self.diagnostics.has_errors()
+    }
+
+    /// Get all errors
+    #[must_use]
+    pub fn errors(&self) -> &[SemanticError] {
+        self.diagnostics.errors()
     }
 
     // ========== Phase 1: Register Types ==========

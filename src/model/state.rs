@@ -83,14 +83,13 @@ impl PartialEq for Value {
                     fields: f2,
                 },
             ) => ty1 == ty2 && v1 == v2 && f1 == f2,
-            (Value::Set(a), Value::Set(b)) => a == b,
-            (Value::List(a), Value::List(b)) => a == b,
+            (Value::Set(a), Value::Set(b))
+            | (Value::List(a), Value::List(b))
+            | (Value::Tuple(a), Value::Tuple(b)) => a == b,
             (Value::Map(a), Value::Map(b)) => a == b,
             (Value::Option(a), Value::Option(b)) => a == b,
             (Value::Result(a), Value::Result(b)) => a == b,
-            (Value::Tuple(a), Value::Tuple(b)) => a == b,
-            // Functions are never equal
-            (Value::Function(_), Value::Function(_)) => false,
+            // Functions are never equal, and mismatched types are not equal
             _ => false,
         }
     }

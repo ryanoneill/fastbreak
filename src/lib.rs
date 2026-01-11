@@ -40,10 +40,12 @@
 #![warn(clippy::pedantic)]
 
 pub mod ast;
+pub mod cli;
 pub mod codegen;
 pub mod lexer;
 pub mod model;
 pub mod parser;
+pub mod project;
 pub mod semantic;
 
 /// Source location information for error reporting

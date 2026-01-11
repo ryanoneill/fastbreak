@@ -272,6 +272,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Evaluate an expression in the given environment
+    #[allow(clippy::too_many_lines, clippy::self_only_used_in_recursion)]
     fn evaluate(
         &self,
         expr: &Expr,
@@ -684,9 +685,8 @@ impl<'a> Checker<'a> {
                 Err(format!("Method {method} not yet fully implemented"))
             }
             "unwrap" => match receiver {
-                Value::Option(Some(v)) => Ok(*v),
+                Value::Option(Some(v)) | Value::Result(Ok(v)) => Ok(*v),
                 Value::Option(None) => Err("unwrap called on None".to_string()),
-                Value::Result(Ok(v)) => Ok(*v),
                 Value::Result(Err(_)) => Err("unwrap called on Err".to_string()),
                 _ => Err("unwrap requires Option or Result".to_string()),
             },

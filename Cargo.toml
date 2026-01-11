@@ -39,6 +39,7 @@ smol_str = "0.3"
 [dev-dependencies]
 insta = { version = "1", features = ["yaml"] }
 pretty_assertions = "1"
+tempfile = "3"
 
 [profile.release]
 lto = true
