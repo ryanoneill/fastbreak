@@ -42,6 +42,7 @@
 pub mod ast;
 pub mod lexer;
 pub mod parser;
+pub mod semantic;
 
 /// Source location information for error reporting
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
