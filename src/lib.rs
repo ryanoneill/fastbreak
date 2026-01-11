@@ -40,6 +40,7 @@
 #![warn(clippy::pedantic)]
 
 pub mod ast;
+pub mod codegen;
 pub mod lexer;
 pub mod model;
 pub mod parser;
