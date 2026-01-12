@@ -6,7 +6,7 @@ use smol_str::SmolStr;
 
 /// State definition block
 ///
-/// ```fbs
+/// ```fbrk
 /// state AuthSystem {
 ///     users: Set<User>,
 ///     sessions: Map<SessionId, UserId>,
@@ -46,7 +46,7 @@ pub struct StateField {
 
 /// An invariant in a state definition
 ///
-/// ```fbs
+/// ```fbrk
 /// invariant "Users have unique emails" {
 ///     forall u1, u2 in users where u1 != u2 =>
 ///         u1.email != u2.email
@@ -66,7 +66,7 @@ pub struct Invariant {
 
 /// Action definition with contracts
 ///
-/// ```fbs
+/// ```fbrk
 /// action register(email: Email) -> Result<User, RegisterError>
 ///     requires {
 ///         not exists u in users where u.email == email

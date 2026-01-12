@@ -87,7 +87,7 @@ impl Loader {
     pub fn new(root: PathBuf) -> Self {
         Self {
             source_dir: root.join("specs"),
-            extension: "fbs".to_string(),
+            extension: "fbrk".to_string(),
             root,
         }
     }
@@ -392,7 +392,7 @@ mod tests {
 
         // Create a source file
         fs::write(
-            dir.path().join("specs/main.fbs"),
+            dir.path().join("specs/main.fbrk"),
             r#"
                 module main
 
@@ -422,7 +422,7 @@ mod tests {
     #[test]
     fn test_load_single_file() {
         let dir = TempDir::new().unwrap();
-        let file_path = dir.path().join("test.fbs");
+        let file_path = dir.path().join("test.fbrk");
 
         fs::write(
             &file_path,
@@ -471,16 +471,16 @@ mod tests {
         fs::create_dir_all(dir.path().join("specs/actions")).unwrap();
 
         // Create source files
-        fs::write(dir.path().join("specs/main.fbs"), "module main").unwrap();
+        fs::write(dir.path().join("specs/main.fbrk"), "module main").unwrap();
 
         fs::write(
-            dir.path().join("specs/models/user.fbs"),
+            dir.path().join("specs/models/user.fbrk"),
             "module user\ntype User { id: Int }",
         )
         .unwrap();
 
         fs::write(
-            dir.path().join("specs/actions/auth.fbs"),
+            dir.path().join("specs/actions/auth.fbrk"),
             "module auth\naction login(user: String) -> Bool",
         )
         .unwrap();
@@ -504,7 +504,7 @@ mod tests {
 
         // Create first file with a type
         fs::write(
-            dir.path().join("specs/types.fbs"),
+            dir.path().join("specs/types.fbrk"),
             r#"
                 type User {
                     id: Int,
@@ -521,7 +521,7 @@ mod tests {
 
         // Create second file with an enum and action
         fs::write(
-            dir.path().join("specs/actions.fbs"),
+            dir.path().join("specs/actions.fbrk"),
             r#"
                 enum Status { Active, Inactive }
 
@@ -532,7 +532,7 @@ mod tests {
 
         // Create third file with a scenario
         fs::write(
-            dir.path().join("specs/scenarios.fbs"),
+            dir.path().join("specs/scenarios.fbrk"),
             r#"
                 scenario "test scenario" {
                     given { x = 1 }
@@ -567,7 +567,7 @@ mod tests {
 
         // Create file with base types
         fs::write(
-            dir.path().join("specs/01_types.fbs"),
+            dir.path().join("specs/01_types.fbrk"),
             r#"
                 type User {
                     id: Int,
@@ -579,7 +579,7 @@ mod tests {
 
         // Create file that references the User type
         fs::write(
-            dir.path().join("specs/02_actions.fbs"),
+            dir.path().join("specs/02_actions.fbrk"),
             r#"
                 action create_user(name: String) -> User
             "#,
@@ -617,7 +617,7 @@ mod tests {
 
         // Create first file
         fs::write(
-            dir.path().join("specs/a.fbs"),
+            dir.path().join("specs/a.fbrk"),
             r#"
                 type TypeA { id: Int }
                 enum EnumA { X, Y }
@@ -627,7 +627,7 @@ mod tests {
 
         // Create second file
         fs::write(
-            dir.path().join("specs/b.fbs"),
+            dir.path().join("specs/b.fbrk"),
             r#"
                 type TypeB { name: String }
                 action do_something(x: Int) -> Bool

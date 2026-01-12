@@ -1,6 +1,6 @@
 //! Lexical analysis for Fastbreak specifications
 //!
-//! This module provides tokenization of `.fbs` source files using the logos crate.
+//! This module provides tokenization of `.fbrk` source files using the logos crate.
 
 mod token;
 

@@ -6,7 +6,7 @@ use smol_str::SmolStr;
 
 /// A scenario definition
 ///
-/// ```fbs
+/// ```fbrk
 /// scenario "New user registration" {
 ///     given {
 ///         users = {}
@@ -44,7 +44,7 @@ pub struct Scenario {
 /// Alternative flows describe error cases, exceptions, or optional behavior
 /// that diverge from the main (happy) path.
 ///
-/// ```fbs
+/// ```fbrk
 /// alt "email already exists" when { exists u in users where u.email == email } {
 ///     then {
 ///         result is Err(DuplicateEmail)
@@ -72,7 +72,7 @@ pub struct Alternative {
 
 /// Given clause - establishes initial state
 ///
-/// ```fbs
+/// ```fbrk
 /// given {
 ///     users = {}
 ///     sessions = {}
@@ -88,7 +88,7 @@ pub struct GivenClause {
 
 /// When clause - the action to perform
 ///
-/// ```fbs
+/// ```fbrk
 /// when {
 ///     result = register("test@example.com")
 /// }
@@ -103,7 +103,7 @@ pub struct WhenClause {
 
 /// Then clause - assertions about the outcome
 ///
-/// ```fbs
+/// ```fbrk
 /// then {
 ///     result is Ok
 ///     users.len() == 1

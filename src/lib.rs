@@ -12,7 +12,7 @@
 //!
 //! # Example
 //!
-//! ```fbs
+//! ```fbrk
 //! module auth
 //!
 //! type User {

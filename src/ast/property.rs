@@ -6,7 +6,7 @@ use smol_str::SmolStr;
 
 /// A property definition for model checking
 ///
-/// ```fbs
+/// ```fbrk
 /// property "Users are unique by email" {
 ///     always {
 ///         forall u1, u2 in users where u1 != u2 =>

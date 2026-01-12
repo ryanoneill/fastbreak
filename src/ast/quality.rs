@@ -6,7 +6,7 @@ use smol_str::SmolStr;
 
 /// A quality requirement definition
 ///
-/// ```fbs
+/// ```fbrk
 /// quality performance "API response time" {
 ///     metric: latency,
 ///     target: < 200ms,

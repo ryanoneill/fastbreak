@@ -171,7 +171,7 @@ scenario "create an example" {{
         module_name = name.replace('-', "_")
     );
 
-    let spec_path = specs_dir.join("main.fbs");
+    let spec_path = specs_dir.join("main.fbrk");
     fs::write(&spec_path, example_spec).map_err(|e| CliError::Io {
         path: spec_path,
         source: e,
@@ -187,7 +187,7 @@ scenario "create an example" {{
 
     println!("Created new Fastbreak project: {name}");
     println!("  {}", manifest_path.display());
-    println!("  {}/main.fbs", specs_dir.display());
+    println!("  {}/main.fbrk", specs_dir.display());
     println!("\nTo get started:");
     println!("  cd {}", project_dir.display());
     println!("  fstbrk check");
@@ -337,14 +337,14 @@ fn load_project(path: &Path) -> Result<Project, CliError> {
         return Loader::load_project(&manifest_path).map_err(|e| CliError::Load(e.to_string()));
     }
 
-    // No manifest found, look for .fbs files in current directory
+    // No manifest found, look for .fbrk files in current directory
     let fbs_files: Vec<_> = path
         .read_dir()
         .ok()
         .into_iter()
         .flatten()
         .filter_map(Result::ok)
-        .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("fbs"))
+        .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("fbrk"))
         .collect();
 
     if let Some(first) = fbs_files.first() {

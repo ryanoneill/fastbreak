@@ -135,7 +135,7 @@ fn default_src_dir() -> PathBuf {
 }
 
 fn default_extension() -> String {
-    "fbs".to_string()
+    "fbrk".to_string()
 }
 
 /// Output configuration
@@ -274,7 +274,7 @@ mod tests {
         assert_eq!(manifest.project.name, "test-project");
         assert_eq!(manifest.project.version, "0.1.0");
         assert_eq!(manifest.source.dir, PathBuf::from("specs"));
-        assert_eq!(manifest.source.extension, "fbs");
+        assert_eq!(manifest.source.extension, "fbrk");
         assert_eq!(manifest.output.dir, PathBuf::from("docs"));
         assert!(manifest.output.markdown);
         assert!(manifest.output.diagrams);
@@ -333,7 +333,7 @@ mod tests {
         let manifest: Manifest = toml::from_str(toml).unwrap();
 
         assert_eq!(manifest.source.dir, PathBuf::from("specs"));
-        assert_eq!(manifest.source.extension, "fbs");
+        assert_eq!(manifest.source.extension, "fbrk");
         assert_eq!(manifest.output.dir, PathBuf::from("docs"));
         assert!(manifest.output.markdown);
         assert!(manifest.output.diagrams);
