@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 /// Fastbreak specification language CLI
 #[derive(Parser, Debug)]
-#[command(name = "fb")]
+#[command(name = "fstbrk")]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
     /// Subcommand to run
@@ -190,8 +190,8 @@ scenario "create an example" {{
     println!("  {}/main.fbs", specs_dir.display());
     println!("\nTo get started:");
     println!("  cd {}", project_dir.display());
-    println!("  fb check");
-    println!("  fb build");
+    println!("  fstbrk check");
+    println!("  fstbrk build");
 
     Ok(())
 }
@@ -390,7 +390,7 @@ impl std::fmt::Display for CliError {
             CliError::NoProject(path) => {
                 write!(
                     f,
-                    "No Fastbreak project found at {}. Run 'fb init' to create one.",
+                    "No Fastbreak project found at {}. Run 'fstbrk init' to create one.",
                     path.display()
                 )
             }
