@@ -295,6 +295,10 @@ pub enum Token {
     #[token("'")]
     Prime,
 
+    /// `@` for attributes
+    #[token("@")]
+    At,
+
     // ========== Operators ==========
     /// `=`
     #[token("=")]
@@ -349,8 +353,8 @@ pub enum Token {
     Bang,
 
     // ========== Literals ==========
-    /// Integer literal
-    #[regex(r"-?[0-9]+", |lex| lex.slice().parse::<i64>().ok())]
+    /// Integer literal (non-negative; negation handled by parser)
+    #[regex(r"[0-9]+", |lex| lex.slice().parse::<i64>().ok())]
     Integer(i64),
 
     /// String literal
@@ -438,6 +442,7 @@ impl std::fmt::Display for Token {
             Token::Pipe => write!(f, "|"),
             Token::Underscore => write!(f, "_"),
             Token::Prime => write!(f, "'"),
+            Token::At => write!(f, "@"),
             Token::Eq => write!(f, "="),
             Token::EqEq => write!(f, "=="),
             Token::NotEq => write!(f, "!="),
@@ -521,7 +526,8 @@ mod tests {
     #[test]
     fn test_integers() {
         assert_eq!(lex("42"), vec![Token::Integer(42)]);
-        assert_eq!(lex("-17"), vec![Token::Integer(-17)]);
+        // Negative integers are lexed as Minus followed by Integer
+        assert_eq!(lex("-17"), vec![Token::Minus, Token::Integer(17)]);
         assert_eq!(lex("0"), vec![Token::Integer(0)]);
     }
 
@@ -667,6 +673,38 @@ mod tests {
                 Token::Comma,
                 Token::Ident("Error".into()),
                 Token::RAngle,
+            ]
+        );
+    }
+
+    #[test]
+    fn test_attribute() {
+        let tokens = lex("@id(REQ-001)");
+        assert_eq!(
+            tokens,
+            vec![
+                Token::At,
+                Token::Ident("id".into()),
+                Token::LParen,
+                Token::Ident("REQ".into()),
+                Token::Minus,
+                Token::Integer(1),
+                Token::RParen,
+            ]
+        );
+    }
+
+    #[test]
+    fn test_attribute_with_string() {
+        let tokens = lex(r#"@rationale("test reason")"#);
+        assert_eq!(
+            tokens,
+            vec![
+                Token::At,
+                Token::Ident("rationale".into()),
+                Token::LParen,
+                Token::String("test reason".into()),
+                Token::RParen,
             ]
         );
     }

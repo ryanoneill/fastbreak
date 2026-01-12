@@ -1,6 +1,6 @@
 //! State and action AST nodes
 
-use super::{Expr, Ident, TypeRef};
+use super::{Attribute, Expr, Ident, TypeRef};
 use crate::Span;
 use smol_str::SmolStr;
 
@@ -19,6 +19,8 @@ use smol_str::SmolStr;
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct StateBlock {
+    /// Attributes (e.g., `@id(STATE-001)`)
+    pub attributes: Vec<Attribute>,
     /// State name
     pub name: Ident,
     /// State fields
@@ -52,6 +54,8 @@ pub struct StateField {
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct Invariant {
+    /// Attributes (e.g., `@id(INV-001)`)
+    pub attributes: Vec<Attribute>,
     /// Optional description
     pub description: Option<SmolStr>,
     /// The invariant expression (must evaluate to Bool)
@@ -76,6 +80,8 @@ pub struct Invariant {
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct Action {
+    /// Attributes (e.g., `@id(ACTION-001)`)
+    pub attributes: Vec<Attribute>,
     /// Action name
     pub name: Ident,
     /// Parameters

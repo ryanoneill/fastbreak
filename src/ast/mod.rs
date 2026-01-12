@@ -4,12 +4,14 @@
 //! The AST is designed to closely mirror the source syntax while being easy to
 //! analyze and transform.
 
+mod attribute;
 mod expr;
 mod property;
 mod scenario;
 mod state;
 mod types;
 
+pub use attribute::{Attribute, AttributeArg};
 pub use expr::{
     BinaryOp, Expr, ExprKind, FieldInit, FieldPattern, LambdaParam, Literal, MatchArm, Pattern,
     PatternKind, QuantBinding, UnaryOp,

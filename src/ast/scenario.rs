@@ -1,6 +1,6 @@
 //! Scenario AST nodes (Cucumber-inspired)
 
-use super::{Expr, Ident};
+use super::{Attribute, Expr, Ident};
 use crate::Span;
 use smol_str::SmolStr;
 
@@ -23,6 +23,8 @@ use smol_str::SmolStr;
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scenario {
+    /// Attributes (e.g., `@id(SCENARIO-001)`)
+    pub attributes: Vec<Attribute>,
     /// Scenario description
     pub description: SmolStr,
     /// Given clause (initial state setup)

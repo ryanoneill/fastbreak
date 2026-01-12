@@ -1,6 +1,6 @@
 //! Property AST nodes (for future model checking)
 
-use super::Expr;
+use super::{Attribute, Expr};
 use crate::Span;
 use smol_str::SmolStr;
 
@@ -16,6 +16,8 @@ use smol_str::SmolStr;
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct Property {
+    /// Attributes (e.g., `@id(PROP-001)`)
+    pub attributes: Vec<Attribute>,
     /// Property description
     pub description: SmolStr,
     /// Temporal operator (if any)

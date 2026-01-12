@@ -8,12 +8,12 @@ mod error;
 pub use error::{ParseError, ParseResult};
 
 use crate::ast::{
-    Action, ActionParam, Assertion, BinaryOp, Binding, BuiltInType, Contract, ContractKind,
-    EnumDef, EnumVariant, Expr, ExprKind, Field, FieldInit, FieldPattern, GenericArg, GivenClause,
-    Ident, Import, ImportItem, Invariant, LambdaParam, Literal, MatchArm, Module, Path, Pattern,
-    PatternKind, Property, QuantBinding, Relation, RelationConstraint, Scenario, Specification,
-    StateBlock, StateField, TemporalOp, ThenClause, TypeDef, TypeRef, TypeRefKind, UnaryOp,
-    WhenClause,
+    Action, ActionParam, Assertion, Attribute, AttributeArg, BinaryOp, Binding, BuiltInType,
+    Contract, ContractKind, EnumDef, EnumVariant, Expr, ExprKind, Field, FieldInit, FieldPattern,
+    GenericArg, GivenClause, Ident, Import, ImportItem, Invariant, LambdaParam, Literal, MatchArm,
+    Module, Path, Pattern, PatternKind, Property, QuantBinding, Relation, RelationConstraint,
+    Scenario, Specification, StateBlock, StateField, TemporalOp, ThenClause, TypeDef, TypeRef,
+    TypeRefKind, UnaryOp, WhenClause,
 };
 use crate::lexer::{Lexer, SpannedToken, Token};
 use crate::Span;
@@ -69,16 +69,27 @@ impl<'src> Parser<'src> {
             spec.imports.push(self.parse_import()?);
         }
 
-        // Parse top-level items
+        // Parse top-level items (with optional preceding attributes)
         while !self.is_at_end() {
+            // Parse any attributes before the item
+            let attributes = self.parse_attributes()?;
+
             match self.peek() {
-                Some(Token::Type) => spec.types.push(self.parse_type_def()?),
-                Some(Token::Enum) => spec.enums.push(self.parse_enum_def()?),
-                Some(Token::Relation) => spec.relations.push(self.parse_relation()?),
-                Some(Token::State) => spec.states.push(self.parse_state_block()?),
-                Some(Token::Action) => spec.actions.push(self.parse_action()?),
-                Some(Token::Scenario) => spec.scenarios.push(self.parse_scenario()?),
-                Some(Token::Property) => spec.properties.push(self.parse_property()?),
+                Some(Token::Type) => spec.types.push(self.parse_type_def_with_attrs(attributes)?),
+                Some(Token::Enum) => spec.enums.push(self.parse_enum_def_with_attrs(attributes)?),
+                Some(Token::Relation) => {
+                    spec.relations.push(self.parse_relation_with_attrs(attributes)?);
+                }
+                Some(Token::State) => {
+                    spec.states.push(self.parse_state_block_with_attrs(attributes)?);
+                }
+                Some(Token::Action) => spec.actions.push(self.parse_action_with_attrs(attributes)?),
+                Some(Token::Scenario) => {
+                    spec.scenarios.push(self.parse_scenario_with_attrs(attributes)?);
+                }
+                Some(Token::Property) => {
+                    spec.properties.push(self.parse_property_with_attrs(attributes)?);
+                }
                 Some(_) => {
                     let (token, span) = self.advance()?;
                     return Err(ParseError::unexpected(
@@ -92,6 +103,87 @@ impl<'src> Parser<'src> {
         }
 
         Ok(spec)
+    }
+
+    // ========== Attributes ==========
+
+    /// Parse zero or more attributes: `@id(REQ-001) @rationale("...")`
+    fn parse_attributes(&mut self) -> ParseResult<Vec<Attribute>> {
+        let mut attributes = Vec::new();
+        while self.check(&Token::At) {
+            attributes.push(self.parse_attribute()?);
+        }
+        Ok(attributes)
+    }
+
+    /// Parse a single attribute: `@name` or `@name(args)`
+    fn parse_attribute(&mut self) -> ParseResult<Attribute> {
+        let start = self.expect(&Token::At)?;
+        let name = self.parse_ident()?;
+
+        let args = if self.check(&Token::LParen) {
+            self.advance()?;
+            let args = self.parse_attribute_args()?;
+            self.expect(&Token::RParen)?;
+            args
+        } else {
+            Vec::new()
+        };
+
+        let end_span = if args.is_empty() {
+            name.span
+        } else {
+            self.previous_span()
+        };
+
+        Ok(Attribute {
+            name,
+            args,
+            span: start.merge(end_span),
+        })
+    }
+
+    /// Parse attribute arguments: `"string", ident, 123`
+    fn parse_attribute_args(&mut self) -> ParseResult<Vec<AttributeArg>> {
+        let mut args = Vec::new();
+
+        while !self.check(&Token::RParen) {
+            let arg = match self.peek() {
+                Some(Token::String(s)) => {
+                    let s = s.clone();
+                    let span = self.current_span();
+                    self.advance()?;
+                    AttributeArg::String(s, span)
+                }
+                Some(Token::Integer(n)) => {
+                    let n = *n;
+                    let span = self.current_span();
+                    self.advance()?;
+                    AttributeArg::Int(n, span)
+                }
+                Some(Token::Ident(_)) => {
+                    let ident = self.parse_ident()?;
+                    AttributeArg::Ident(ident)
+                }
+                Some(token) => {
+                    let token = token.clone();
+                    let span = self.current_span();
+                    return Err(ParseError::unexpected(
+                        "attribute argument (string, identifier, or integer)",
+                        &token,
+                        span,
+                    ));
+                }
+                None => return Err(ParseError::unexpected_eof("attribute argument", self.eof_span())),
+            };
+            args.push(arg);
+
+            if !self.check(&Token::RParen) {
+                self.expect(&Token::Comma)?;
+            }
+        }
+
+        Ok(args)
     }
 
     // ========== Module and Imports ==========
@@ -142,7 +234,7 @@ impl<'src> Parser<'src> {
 
     // ========== Type Definitions ==========
 
-    fn parse_type_def(&mut self) -> ParseResult<TypeDef> {
+    fn parse_type_def_with_attrs(&mut self, attributes: Vec<Attribute>) -> ParseResult<TypeDef> {
         let start = self.expect(&Token::Type)?;
         let name = self.parse_ident()?;
 
@@ -158,6 +250,7 @@ impl<'src> Parser<'src> {
         let end = self.expect(&Token::RBrace)?;
 
         Ok(TypeDef {
+            attributes,
             name,
             type_params,
             fields,
@@ -180,7 +273,7 @@ impl<'src> Parser<'src> {
         Ok(params)
     }
 
-    fn parse_enum_def(&mut self) -> ParseResult<EnumDef> {
+    fn parse_enum_def_with_attrs(&mut self, attributes: Vec<Attribute>) -> ParseResult<EnumDef> {
         let start = self.expect(&Token::Enum)?;
         let name = self.parse_ident()?;
 
@@ -195,6 +288,7 @@ impl<'src> Parser<'src> {
         let end = self.expect(&Token::RBrace)?;
 
         Ok(EnumDef {
+            attributes,
             name,
             type_params,
             variants,
@@ -369,7 +463,7 @@ impl<'src> Parser<'src> {
 
     // ========== Relations ==========
 
-    fn parse_relation(&mut self) -> ParseResult<Relation> {
+    fn parse_relation_with_attrs(&mut self, attributes: Vec<Attribute>) -> ParseResult<Relation> {
         let start = self.expect(&Token::Relation)?;
         let name = self.parse_ident()?;
         self.expect(&Token::Colon)?;
@@ -394,6 +488,7 @@ impl<'src> Parser<'src> {
             .map_or(target.span, |_| self.previous_span());
 
         Ok(Relation {
+            attributes,
             name,
             source,
             target,
@@ -438,7 +533,10 @@ impl<'src> Parser<'src> {
 
     // ========== State Blocks ==========
 
-    fn parse_state_block(&mut self) -> ParseResult<StateBlock> {
+    fn parse_state_block_with_attrs(
+        &mut self,
+        attributes: Vec<Attribute>,
+    ) -> ParseResult<StateBlock> {
         let start = self.expect(&Token::State)?;
         let name = self.parse_ident()?;
         self.expect(&Token::LBrace)?;
@@ -447,8 +545,19 @@ impl<'src> Parser<'src> {
         let mut invariants = Vec::new();
 
         while !self.check(&Token::RBrace) {
+            // Parse attributes for invariants
+            let inv_attrs = self.parse_attributes()?;
+
             if self.check(&Token::Invariant) {
-                invariants.push(self.parse_invariant()?);
+                invariants.push(self.parse_invariant_with_attrs(inv_attrs)?);
+            } else if !inv_attrs.is_empty() {
+                // Attributes before a non-invariant item - unexpected
+                let (token, span) = self.advance()?;
+                return Err(ParseError::unexpected(
+                    "invariant after attributes",
+                    &token,
+                    span,
+                ));
             } else {
                 fields.push(self.parse_state_field()?);
                 // Allow optional comma after field
@@ -459,6 +568,7 @@ impl<'src> Parser<'src> {
         let end = self.expect(&Token::RBrace)?;
 
         Ok(StateBlock {
+            attributes,
             name,
             fields,
             invariants,
@@ -487,7 +597,7 @@ impl<'src> Parser<'src> {
         })
     }
 
-    fn parse_invariant(&mut self) -> ParseResult<Invariant> {
+    fn parse_invariant_with_attrs(&mut self, attributes: Vec<Attribute>) -> ParseResult<Invariant> {
         let start = self.expect(&Token::Invariant)?;
 
         let description = if let Some(Token::String(s)) = self.peek() {
@@ -503,6 +613,7 @@ impl<'src> Parser<'src> {
         let end = self.expect(&Token::RBrace)?;
 
         Ok(Invariant {
+            attributes,
             description,
             expr,
             span: start.merge(end),
@@ -511,7 +622,7 @@ impl<'src> Parser<'src> {
 
     // ========== Actions ==========
 
-    fn parse_action(&mut self) -> ParseResult<Action> {
+    fn parse_action_with_attrs(&mut self, attributes: Vec<Attribute>) -> ParseResult<Action> {
         let start = self.expect(&Token::Action)?;
         let name = self.parse_ident()?;
 
@@ -548,6 +659,7 @@ impl<'src> Parser<'src> {
             .unwrap_or(name.span);
 
         Ok(Action {
+            attributes,
             name,
             params,
             return_type,
@@ -585,7 +697,7 @@ impl<'src> Parser<'src> {
 
     // ========== Scenarios ==========
 
-    fn parse_scenario(&mut self) -> ParseResult<Scenario> {
+    fn parse_scenario_with_attrs(&mut self, attributes: Vec<Attribute>) -> ParseResult<Scenario> {
         let start = self.expect(&Token::Scenario)?;
 
         let description = match self.peek() {
@@ -611,6 +723,7 @@ impl<'src> Parser<'src> {
         let end = self.expect(&Token::RBrace)?;
 
         Ok(Scenario {
+            attributes,
             description,
             given,
             when,
@@ -690,7 +803,7 @@ impl<'src> Parser<'src> {
 
     // ========== Properties ==========
 
-    fn parse_property(&mut self) -> ParseResult<Property> {
+    fn parse_property_with_attrs(&mut self, attributes: Vec<Attribute>) -> ParseResult<Property> {
         let start = self.expect(&Token::Property)?;
 
         let description = match self.peek() {
@@ -732,6 +845,7 @@ impl<'src> Parser<'src> {
         let end = self.expect(&Token::RBrace)?;
 
         Ok(Property {
+            attributes,
             description,
             temporal_op,
             expr,
@@ -2104,5 +2218,118 @@ mod tests {
         )
         .unwrap();
         assert!(!spec.states[0].invariants.is_empty());
+    }
+
+    #[test]
+    fn test_parse_attribute_simple() {
+        let spec = parse(
+            r#"
+            @id(TYPE001)
+            type User {
+                id: Int
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.types.len(), 1);
+        assert_eq!(spec.types[0].attributes.len(), 1);
+        assert_eq!(spec.types[0].attributes[0].name.as_str(), "id");
+    }
+
+    #[test]
+    fn test_parse_attribute_with_string() {
+        let spec = parse(
+            r#"
+            @rationale("Users must be uniquely identifiable")
+            type User {
+                id: Int
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.types[0].attributes.len(), 1);
+        assert_eq!(spec.types[0].attributes[0].name.as_str(), "rationale");
+        assert_eq!(spec.types[0].attributes[0].args.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_multiple_attributes() {
+        let spec = parse(
+            r#"
+            @id(REQ001)
+            @stakeholder(security_team)
+            @rationale("Security requirement")
+            action authenticate(user: String) -> Result<Token, Error>
+                requires { true }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.actions.len(), 1);
+        assert_eq!(spec.actions[0].attributes.len(), 3);
+        assert_eq!(spec.actions[0].attributes[0].name.as_str(), "id");
+        assert_eq!(spec.actions[0].attributes[1].name.as_str(), "stakeholder");
+        assert_eq!(spec.actions[0].attributes[2].name.as_str(), "rationale");
+    }
+
+    #[test]
+    fn test_parse_attribute_on_all_constructs() {
+        let spec = parse(
+            r#"
+            @id(TYPE001)
+            type User { id: Int }
+
+            @id(ENUM001)
+            enum Status { Active, Inactive }
+
+            @id(REL001)
+            relation friends: User -> Set<User>
+
+            @id(STATE001)
+            state AppState {
+                users: Set<User>
+
+                @id(INV001)
+                invariant "non-empty" { users.len() > 0 }
+            }
+
+            @id(ACTION001)
+            action create() -> User
+                requires { true }
+
+            @id(SCENARIO001)
+            scenario "test" {
+                given { x = 1 }
+                when { y = 2 }
+                then { x + y == 3 }
+            }
+
+            @id(PROP001)
+            property "always true" {
+                always { true }
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.types[0].attributes[0].name.as_str(), "id");
+        assert_eq!(spec.enums[0].attributes[0].name.as_str(), "id");
+        assert_eq!(spec.relations[0].attributes[0].name.as_str(), "id");
+        assert_eq!(spec.states[0].attributes[0].name.as_str(), "id");
+        assert_eq!(spec.states[0].invariants[0].attributes[0].name.as_str(), "id");
+        assert_eq!(spec.actions[0].attributes[0].name.as_str(), "id");
+        assert_eq!(spec.scenarios[0].attributes[0].name.as_str(), "id");
+        assert_eq!(spec.properties[0].attributes[0].name.as_str(), "id");
+    }
+
+    #[test]
+    fn test_parse_attribute_no_args() {
+        let spec = parse(
+            r#"
+            @deprecated
+            type OldUser { id: Int }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.types[0].attributes[0].name.as_str(), "deprecated");
+        assert!(spec.types[0].attributes[0].args.is_empty());
     }
 }

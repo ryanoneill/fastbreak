@@ -1,6 +1,6 @@
 //! Type-related AST nodes
 
-use super::{Ident, Path};
+use super::{Attribute, Ident, Path};
 use crate::Span;
 
 /// Module declaration: `module auth`
@@ -35,6 +35,8 @@ pub struct ImportItem {
 /// Type definition: `type User { id: UserId, email: Email }`
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeDef {
+    /// Attributes (e.g., `@id(TYPE-001)`)
+    pub attributes: Vec<Attribute>,
     /// Type name
     pub name: Ident,
     /// Type parameters
@@ -59,6 +61,8 @@ pub struct Field {
 /// Enum definition: `enum UserStatus { Active, Suspended }`
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnumDef {
+    /// Attributes (e.g., `@id(ENUM-001)`)
+    pub attributes: Vec<Attribute>,
     /// Enum name
     pub name: Ident,
     /// Type parameters
@@ -162,6 +166,8 @@ pub struct GenericArg {
 /// Relation definition: `relation friends: User -> Set<User> { symmetric }`
 #[derive(Debug, Clone, PartialEq)]
 pub struct Relation {
+    /// Attributes (e.g., `@id(REL-001)`)
+    pub attributes: Vec<Attribute>,
     /// Relation name
     pub name: Ident,
     /// Source type
