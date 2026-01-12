@@ -15,7 +15,7 @@ mod types;
 pub use attribute::{Attribute, AttributeArg};
 pub use expr::{
     BinaryOp, Expr, ExprKind, FieldInit, FieldPattern, LambdaParam, Literal, MatchArm, Pattern,
-    PatternKind, QuantBinding, UnaryOp,
+    PatternKind, QuantBinding, QuantBindingKind, UnaryOp,
 };
 pub use property::{Property, TemporalOp};
 pub use quality::{

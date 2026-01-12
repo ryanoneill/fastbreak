@@ -1,0 +1,18 @@
+[project]
+name = "fastbreak-spec"
+version = "0.1.0"
+authors = []
+
+[source]
+dir = "specs"
+extension = "fbrk"
+
+[output]
+dir = "docs"
+markdown = true
+diagrams = true
+
+[output.diagram_types]
+erd = true
+state = true
+sequence = true

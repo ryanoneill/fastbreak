@@ -101,7 +101,11 @@ mod tests {
             .map(|st| st.token)
             .collect();
 
-        assert_eq!(tokens, vec![Token::Module, Token::Ident("auth".into())]);
+        // 'module' is now a contextual keyword (identifier)
+        assert_eq!(
+            tokens,
+            vec![Token::Ident("module".into()), Token::Ident("auth".into())]
+        );
     }
 
     #[test]

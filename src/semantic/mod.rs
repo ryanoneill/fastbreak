@@ -21,8 +21,8 @@ pub use types::{
 
 use crate::ast::{
     Action, Alternative, Attribute, AttributeArg, BinaryOp, BuiltInType, EnumDef, Expr, ExprKind,
-    Literal, Pattern, PatternKind, Quality, QualityValue, Relation, Scenario, Specification,
-    StateBlock, TypeDef, TypeRef, TypeRefKind, UnaryOp,
+    Literal, Pattern, PatternKind, Quality, QualityValue, QuantBindingKind, Relation, Scenario,
+    Specification, StateBlock, TypeDef, TypeRef, TypeRefKind, UnaryOp,
 };
 use crate::Span;
 use indexmap::IndexMap;
@@ -1197,8 +1197,13 @@ impl Analyzer {
         self.symbols.enter_scope(ScopeKind::Quantifier);
 
         for binding in bindings {
-            let collection_type = self.check_expr(&binding.collection);
-            let elem_type = collection_type.element_type().cloned().unwrap_or(Type::Unknown);
+            let elem_type = match &binding.kind {
+                QuantBindingKind::InCollection(collection) => {
+                    let collection_type = self.check_expr(collection);
+                    collection_type.element_type().cloned().unwrap_or(Type::Unknown)
+                }
+                QuantBindingKind::Typed(type_ref) => self.resolve_type(type_ref),
+            };
 
             self.symbols.define(Symbol::new(
                 binding.name.name.clone(),

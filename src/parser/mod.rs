@@ -13,9 +13,9 @@ use crate::ast::{
     FieldInit, FieldPattern, GenericArg, GivenClause, Ident, Import, ImportItem, Invariant,
     LambdaParam, Literal, MatchArm, Module, Path, Pattern, PatternKind, Property, Quality,
     QualityCategory, QualityOp, QualityProperty, QualityPropertyValue, QualityTarget, QualityValue,
-    QuantBinding, RateUnit, Relation, RelationConstraint, Scenario, Specification, StateBlock,
-    StateField, TemporalOp, ThenClause, TypeAlias, TypeDef, TypeRef, TypeRefKind, UnaryOp,
-    WhenClause,
+    QuantBinding, QuantBindingKind, RateUnit, Relation, RelationConstraint, Scenario, Specification,
+    StateBlock, StateField, TemporalOp, ThenClause, TypeAlias, TypeDef, TypeRef, TypeRefKind,
+    UnaryOp, WhenClause,
 };
 
 /// Represents either a type definition or a type alias
@@ -68,7 +68,7 @@ impl<'src> Parser<'src> {
         let mut spec = Specification::new();
 
         // Parse module declaration if present
-        if self.check(&Token::Module) {
+        if self.check_keyword_ident("module") {
             spec.module = Some(self.parse_module()?);
         }
 
@@ -206,7 +206,7 @@ impl<'src> Parser<'src> {
     // ========== Module and Imports ==========
 
     fn parse_module(&mut self) -> ParseResult<Module> {
-        let start = self.expect(&Token::Module)?;
+        let start = self.expect_keyword_ident("module")?;
         let name = self.parse_ident()?;
         let span = start.merge(name.span);
         Ok(Module { name, span })
@@ -410,21 +410,30 @@ impl<'src> Parser<'src> {
     fn parse_primary_type(&mut self) -> ParseResult<TypeRef> {
         match self.peek() {
             Some(Token::LParen) => self.parse_tuple_or_unit_type(),
-            Some(Token::SetType) => self.parse_builtin_type(BuiltInType::Set),
-            Some(Token::MapType) => self.parse_builtin_type(BuiltInType::Map),
-            Some(Token::ListType) => self.parse_builtin_type(BuiltInType::List),
-            Some(Token::OptionType) => self.parse_builtin_type(BuiltInType::Option),
-            Some(Token::ResultType) => self.parse_builtin_type(BuiltInType::Result),
-            Some(Token::StringType) => self.parse_builtin_type(BuiltInType::String),
-            Some(Token::IntType) => self.parse_builtin_type(BuiltInType::Int),
-            Some(Token::BoolType) => self.parse_builtin_type(BuiltInType::Bool),
-            Some(Token::Ident(_)) => {
-                let path = self.parse_path()?;
-                let span = path.span;
-                Ok(TypeRef {
-                    kind: TypeRefKind::Named(path),
-                    span,
-                })
+            Some(Token::Ident(name)) => {
+                // Check if identifier is a built-in type
+                let builtin = match name.as_str() {
+                    "Set" => Some(BuiltInType::Set),
+                    "Map" => Some(BuiltInType::Map),
+                    "List" => Some(BuiltInType::List),
+                    "Option" => Some(BuiltInType::Option),
+                    "Result" => Some(BuiltInType::Result),
+                    "String" => Some(BuiltInType::String),
+                    "Int" => Some(BuiltInType::Int),
+                    "Bool" => Some(BuiltInType::Bool),
+                    _ => None,
+                };
+
+                if let Some(builtin_type) = builtin {
+                    self.parse_builtin_type(builtin_type)
+                } else {
+                    let path = self.parse_path()?;
+                    let span = path.span;
+                    Ok(TypeRef {
+                        kind: TypeRefKind::Named(path),
+                        span,
+                    })
+                }
             }
             Some(token) => {
                 let token = token.clone();
@@ -815,7 +824,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_given_clause(&mut self) -> ParseResult<GivenClause> {
-        let start = self.expect(&Token::Given)?;
+        let start = self.expect_keyword_ident("given")?;
         self.expect(&Token::LBrace)?;
 
         let mut bindings = Vec::new();
@@ -832,7 +841,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_when_clause(&mut self) -> ParseResult<WhenClause> {
-        let start = self.expect(&Token::When)?;
+        let start = self.expect_keyword_ident("when")?;
         self.expect(&Token::LBrace)?;
 
         let mut bindings = Vec::new();
@@ -849,7 +858,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_then_clause(&mut self) -> ParseResult<ThenClause> {
-        let start = self.expect(&Token::Then)?;
+        let start = self.expect_keyword_ident("then")?;
         self.expect(&Token::LBrace)?;
 
         let mut assertions = Vec::new();
@@ -914,7 +923,7 @@ impl<'src> Parser<'src> {
         };
 
         // Optional condition: `when { expr }`
-        let condition = if self.check(&Token::When) {
+        let condition = if self.check_keyword_ident("when") {
             self.advance()?; // consume 'when'
             self.expect(&Token::LBrace)?;
             let expr = self.parse_expr()?;
@@ -927,14 +936,14 @@ impl<'src> Parser<'src> {
         self.expect(&Token::LBrace)?;
 
         // Optional given clause (extends base)
-        let given = if self.check(&Token::Given) {
+        let given = if self.check_keyword_ident("given") {
             Some(self.parse_given_clause()?)
         } else {
             None
         };
 
         // Optional when clause (replaces base)
-        let when = if self.check(&Token::When) {
+        let when = if self.check_keyword_ident("when") {
             Some(self.parse_when_clause()?)
         } else {
             None
@@ -1043,7 +1052,7 @@ impl<'src> Parser<'src> {
         self.expect(&Token::LBrace)?;
 
         // Parse metric (required)
-        self.expect(&Token::Metric)?;
+        self.expect_keyword_ident("metric")?;
         self.expect(&Token::Colon)?;
         let metric = self.parse_ident()?;
         // Optional comma
@@ -1052,7 +1061,7 @@ impl<'src> Parser<'src> {
         }
 
         // Parse target (required)
-        self.expect(&Token::Target)?;
+        self.expect_keyword_ident("target")?;
         self.expect(&Token::Colon)?;
         let target = self.parse_quality_target()?;
         // Optional comma
@@ -1085,29 +1094,22 @@ impl<'src> Parser<'src> {
 
     fn parse_quality_category(&mut self) -> ParseResult<QualityCategory> {
         match self.peek() {
-            Some(Token::Performance) => {
+            Some(Token::Ident(name)) => {
+                let category = match name.as_str() {
+                    "performance" => QualityCategory::Performance,
+                    "reliability" => QualityCategory::Reliability,
+                    "security" => QualityCategory::Security,
+                    "usability" => QualityCategory::Usability,
+                    "scalability" => QualityCategory::Scalability,
+                    "maintainability" => QualityCategory::Maintainability,
+                    _ => {
+                        let token = Token::Ident(name.clone());
+                        let span = self.current_span();
+                        return Err(ParseError::unexpected("quality category", &token, span));
+                    }
+                };
                 self.advance()?;
-                Ok(QualityCategory::Performance)
-            }
-            Some(Token::Reliability) => {
-                self.advance()?;
-                Ok(QualityCategory::Reliability)
-            }
-            Some(Token::Security) => {
-                self.advance()?;
-                Ok(QualityCategory::Security)
-            }
-            Some(Token::Usability) => {
-                self.advance()?;
-                Ok(QualityCategory::Usability)
-            }
-            Some(Token::Scalability) => {
-                self.advance()?;
-                Ok(QualityCategory::Scalability)
-            }
-            Some(Token::Maintainability) => {
-                self.advance()?;
-                Ok(QualityCategory::Maintainability)
+                Ok(category)
             }
             Some(token) => {
                 let token = token.clone();
@@ -1791,33 +1793,71 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_quant_bindings(&mut self) -> ParseResult<Vec<QuantBinding>> {
-        let mut bindings = Vec::new();
+        let mut all_bindings = Vec::new();
 
-        // Parse variable names (can be comma-separated before `in`)
-        let mut names = vec![self.parse_ident()?];
-        while self.check(&Token::Comma) {
-            self.advance()?;
-            // Stop if we hit `in` keyword next (it's an identifier check)
-            if self.check(&Token::In) {
+        loop {
+            // Parse one binding group (either typed or collection with possibly multiple names)
+            let binding_group = self.parse_binding_group()?;
+            all_bindings.extend(binding_group);
+
+            // If we see a comma, there's another binding group
+            if self.check(&Token::Comma) {
+                self.advance()?; // consume comma
+                // Continue parsing next binding group
+            } else {
                 break;
             }
-            names.push(self.parse_ident()?);
         }
 
-        self.expect(&Token::In)?;
-        let collection = self.parse_postfix_expr()?;
+        Ok(all_bindings)
+    }
 
-        // Create a binding for each variable, all sharing the same collection
-        for name in names {
-            let span = name.span.merge(collection.span);
-            bindings.push(QuantBinding {
-                name,
-                collection: collection.clone(),
+    fn parse_binding_group(&mut self) -> ParseResult<Vec<QuantBinding>> {
+        // A binding group is either:
+        // 1. `name: Type` - single typed binding
+        // 2. `name1, name2, ... in collection` - multiple names sharing one collection
+
+        let first_name = self.parse_ident()?;
+
+        if self.check(&Token::Colon) {
+            // Typed binding: `name: Type`
+            self.advance()?; // consume ':'
+            let type_ref = self.parse_type_ref()?;
+            let span = first_name.span.merge(type_ref.span);
+            Ok(vec![QuantBinding {
+                name: first_name,
+                kind: QuantBindingKind::Typed(type_ref),
                 span,
-            });
-        }
+            }])
+        } else {
+            // Collection binding: `name1, name2, ... in collection`
+            let mut names = vec![first_name];
 
-        Ok(bindings)
+            // Collect additional names before 'in'
+            while self.check(&Token::Comma) {
+                self.advance()?; // consume comma
+                // If next is 'in', we've collected all names
+                if self.check(&Token::In) {
+                    break;
+                }
+                names.push(self.parse_ident()?);
+            }
+
+            self.expect(&Token::In)?;
+            let collection = self.parse_postfix_expr()?;
+
+            // Create a binding for each name, all sharing the same collection
+            let mut bindings = Vec::new();
+            for name in names {
+                let span = name.span.merge(collection.span);
+                bindings.push(QuantBinding {
+                    name,
+                    kind: QuantBindingKind::InCollection(collection.clone()),
+                    span,
+                });
+            }
+            Ok(bindings)
+        }
     }
 
     fn parse_match_expr(&mut self) -> ParseResult<Expr> {
@@ -2446,6 +2486,26 @@ impl<'src> Parser<'src> {
         } else {
             Err(ParseError::unexpected_eof(expected.to_string(), self.eof_span()))
         }
+    }
+
+    /// Expect an identifier with a specific name (for contextual keywords)
+    fn expect_keyword_ident(&mut self, expected: &str) -> ParseResult<Span> {
+        if self.check_keyword_ident(expected) {
+            let (_, span) = self.advance()?;
+            return Ok(span);
+        }
+        if let Some(token) = self.peek() {
+            let token = token.clone();
+            let span = self.current_span();
+            Err(ParseError::unexpected(expected, &token, span))
+        } else {
+            Err(ParseError::unexpected_eof(expected, self.eof_span()))
+        }
+    }
+
+    /// Check if current token is an identifier with a specific name
+    fn check_keyword_ident(&self, expected: &str) -> bool {
+        matches!(self.peek(), Some(Token::Ident(name)) if name.as_str() == expected)
     }
 
     fn is_at_end(&self) -> bool {

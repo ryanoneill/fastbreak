@@ -1,0 +1,426 @@
+// Fastbreak Self-Specification
+// A formal specification of Fastbreak's own domain model
+module fastbreak
+
+// ============================================================================
+// Core Types
+// ============================================================================
+
+type Identifier {
+    name: String,
+}
+
+type Span {
+    start: Int,
+    end: Int,
+}
+
+enum PrimitiveType {
+    Int,
+    String,
+    Bool,
+    Float,
+}
+
+// ============================================================================
+// Type System
+// ============================================================================
+
+type TypeRef {
+    name: Identifier,
+    generics: List<TypeRef>,
+    span: Span,
+}
+
+type Field {
+    name: Identifier,
+    field_type: TypeRef,
+    refinement: Option<Expression>,
+    span: Span,
+}
+
+type TypeDefinition {
+    name: Identifier,
+    fields: List<Field>,
+    span: Span,
+}
+
+type EnumVariant {
+    name: Identifier,
+    span: Span,
+}
+
+type EnumDefinition {
+    name: Identifier,
+    variants: List<EnumVariant>,
+    span: Span,
+}
+
+type TypeAlias {
+    name: Identifier,
+    target: TypeRef,
+    refinement: Option<Expression>,
+    span: Span,
+}
+
+// ============================================================================
+// State and Actions
+// ============================================================================
+
+type StateField {
+    name: Identifier,
+    field_type: TypeRef,
+    initial_value: Option<Expression>,
+    span: Span,
+}
+
+type Invariant {
+    description: Option<String>,
+    expression: Expression,
+    span: Span,
+}
+
+type StateDefinition {
+    name: Identifier,
+    fields: List<StateField>,
+    invariants: List<Invariant>,
+    span: Span,
+}
+
+type Parameter {
+    name: Identifier,
+    param_type: TypeRef,
+    span: Span,
+}
+
+enum ContractKind {
+    Requires,
+    Ensures,
+}
+
+type Contract {
+    kind: ContractKind,
+    expression: Expression,
+    span: Span,
+}
+
+type ActionDefinition {
+    name: Identifier,
+    parameters: List<Parameter>,
+    return_type: Option<TypeRef>,
+    contracts: List<Contract>,
+    span: Span,
+}
+
+// ============================================================================
+// Scenarios
+// ============================================================================
+
+type Binding {
+    name: Identifier,
+    value: Expression,
+    span: Span,
+}
+
+type Assertion {
+    expression: Expression,
+    description: Option<String>,
+    span: Span,
+}
+
+type GivenClause {
+    bindings: List<Binding>,
+    span: Span,
+}
+
+type WhenClause {
+    bindings: List<Binding>,
+    span: Span,
+}
+
+type ThenClause {
+    assertions: List<Assertion>,
+    span: Span,
+}
+
+type Alternative {
+    name: String,
+    condition: Option<Expression>,
+    given: Option<GivenClause>,
+    when: Option<WhenClause>,
+    then_clause: ThenClause,
+    span: Span,
+}
+
+type Scenario {
+    description: String,
+    given: GivenClause,
+    when_clause: WhenClause,
+    then_clause: ThenClause,
+    alternatives: List<Alternative>,
+    span: Span,
+}
+
+// ============================================================================
+// Properties
+// ============================================================================
+
+enum TemporalOperator {
+    Always,
+    Eventually,
+}
+
+type Property {
+    description: String,
+    temporal_op: Option<TemporalOperator>,
+    expression: Expression,
+    span: Span,
+}
+
+// ============================================================================
+// Expressions (simplified)
+// ============================================================================
+
+type Expression {
+    kind: ExpressionKind,
+    span: Span,
+}
+
+enum ExpressionKind {
+    Literal,
+    Identifier,
+    BinaryOp,
+    UnaryOp,
+    Call,
+    FieldAccess,
+    Quantifier,
+}
+
+// ============================================================================
+// Specification (top-level)
+// ============================================================================
+
+type Module {
+    name: Identifier,
+    span: Span,
+}
+
+type Specification {
+    module: Option<Module>,
+    types: List<TypeDefinition>,
+    enums: List<EnumDefinition>,
+    type_aliases: List<TypeAlias>,
+    states: List<StateDefinition>,
+    actions: List<ActionDefinition>,
+    scenarios: List<Scenario>,
+    properties: List<Property>,
+}
+
+// ============================================================================
+// State: Compiler Pipeline
+// ============================================================================
+
+state CompilerPipeline {
+    source_files: Set<String>,
+    parsed_specs: Map<String, Specification>,
+    errors: List<String>,
+
+    invariant "All parsed specs have source files" {
+        forall path in parsed_specs.keys() =>
+            path in source_files
+    }
+}
+
+// ============================================================================
+// Actions: Compiler Operations
+// ============================================================================
+
+action parse(source: String) -> Result<Specification, String>
+    ensures {
+        match result {
+            Ok(spec) => spec.types.len() >= 0,
+            Err(msg) => msg.len() > 0,
+        }
+    }
+
+action analyze(spec: Specification) -> List<String>
+    ensures {
+        // Returns list of semantic errors (empty if valid)
+        result.len() >= 0
+    }
+
+action compile(spec: Specification) -> CompiledSpec
+    requires {
+        // Specification must pass semantic analysis
+        analyze(spec).len() == 0
+    }
+
+action generate_markdown(spec: CompiledSpec) -> String
+    ensures {
+        result.len() > 0
+    }
+
+action generate_diagram(spec: CompiledSpec, diagram_type: DiagramType) -> String
+    ensures {
+        result.len() > 0
+    }
+
+// ============================================================================
+// Supporting Types for Actions
+// ============================================================================
+
+type CompiledSpec {
+    name: String,
+    structs: List<CompiledStruct>,
+    enums: List<CompiledEnum>,
+    states: List<CompiledState>,
+    actions: List<CompiledAction>,
+    scenarios: List<CompiledScenario>,
+    properties: List<CompiledProperty>,
+}
+
+type CompiledStruct {
+    name: String,
+    fields: List<CompiledField>,
+}
+
+type CompiledField {
+    name: String,
+    field_type: String,
+}
+
+type CompiledEnum {
+    name: String,
+    variants: List<String>,
+}
+
+type CompiledState {
+    name: String,
+    fields: List<CompiledField>,
+    invariants: List<String>,
+}
+
+type CompiledAction {
+    name: String,
+    parameters: List<CompiledField>,
+    return_type: Option<String>,
+    preconditions: List<String>,
+    postconditions: List<String>,
+}
+
+type CompiledScenario {
+    description: String,
+    given: List<String>,
+    when_action: List<String>,
+    then_assertions: List<String>,
+}
+
+type CompiledProperty {
+    description: String,
+    temporal_op: Option<String>,
+    expression: String,
+}
+
+enum DiagramType {
+    Erd,
+    State,
+    Sequence,
+}
+
+// ============================================================================
+// Scenarios: Usage Examples
+// ============================================================================
+
+scenario "Parse a simple type definition" {
+    given {
+        source = "type User { id: Int, name: String }"
+    }
+    when {
+        result = parse(source)
+    }
+    then {
+        result is Ok
+        result.unwrap().types.len() == 1
+    }
+}
+
+scenario "Parse a state with invariant" {
+    given {
+        // Note: Source contains a state with invariant
+        source = "state System { users: Set<User> }"
+    }
+    when {
+        result = parse(source)
+    }
+    then {
+        result is Ok
+        result.unwrap().states.len() == 1
+    }
+}
+
+scenario "Generate documentation from compiled spec" {
+    given {
+        spec = CompiledSpec {
+            name: "test",
+            structs: [],
+            enums: [],
+            states: [],
+            actions: [],
+            scenarios: [],
+            properties: [],
+        }
+    }
+    when {
+        markdown = generate_markdown(spec)
+    }
+    then {
+        markdown.len() > 0
+    }
+}
+
+// ============================================================================
+// Properties: System Guarantees
+// ============================================================================
+
+property "Parsing is deterministic" {
+    always {
+        forall source: String =>
+            parse(source) == parse(source)
+    }
+}
+
+property "Valid specs produce no errors" {
+    always {
+        forall spec: Specification where analyze(spec).len() == 0 =>
+            compile(spec) is Ok
+    }
+}
+
+property "Type names are unique within a specification" {
+    always {
+        forall spec: Specification, t1, t2 in spec.types where t1 != t2 =>
+            t1.name != t2.name
+    }
+}
+
+// ============================================================================
+// Quality Requirements
+// ============================================================================
+
+@id("NFR-001")
+quality performance "Parse time for typical specs" {
+    metric: latency,
+    target: < 100ms,
+}
+
+@id("NFR-002")
+quality reliability "Parser handles malformed input gracefully" {
+    metric: error_handling,
+    target: == 100%,
+}
+
+@id("NFR-003")
+quality maintainability "Code coverage" {
+    metric: test_coverage,
+    target: >= 80%,
+}

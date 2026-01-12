@@ -301,13 +301,22 @@ impl std::fmt::Display for UnaryOp {
     }
 }
 
+/// The kind of quantifier binding
+#[derive(Debug, Clone, PartialEq)]
+pub enum QuantBindingKind {
+    /// Binding over a collection: `x in collection`
+    InCollection(Expr),
+    /// Typed binding: `x: Type` (quantifies over all values of the type)
+    Typed(TypeRef),
+}
+
 /// A binding in a quantifier
 #[derive(Debug, Clone, PartialEq)]
 pub struct QuantBinding {
     /// Variable name
     pub name: Ident,
-    /// Collection to iterate over
-    pub collection: Expr,
+    /// The binding kind (collection or typed)
+    pub kind: QuantBindingKind,
     /// Span of the binding
     pub span: Span,
 }

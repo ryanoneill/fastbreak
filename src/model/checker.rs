@@ -5,7 +5,7 @@
 
 use super::spec::{CompiledInvariant, CompiledProperty, CompiledSpec, TemporalOp};
 use super::state::{Environment, StateSnapshot, Trace, Value};
-use crate::ast::{BinaryOp, Expr, ExprKind, Literal, UnaryOp};
+use crate::ast::{BinaryOp, Expr, ExprKind, Literal, QuantBindingKind, UnaryOp};
 use crate::Span;
 use std::sync::Arc;
 
@@ -345,7 +345,20 @@ impl<'a> Checker<'a> {
                 }
 
                 let binding = &bindings[0];
-                let collection = self.evaluate(&binding.collection, env, state)?;
+
+                // Get the collection from the binding
+                let collection = match &binding.kind {
+                    QuantBindingKind::InCollection(coll_expr) => {
+                        self.evaluate(coll_expr, env, state)?
+                    }
+                    QuantBindingKind::Typed(_) => {
+                        // Typed quantifiers can't be evaluated at runtime
+                        // (we can't enumerate all values of a type)
+                        return Err(
+                            "typed quantifiers cannot be evaluated at runtime".to_string(),
+                        );
+                    }
+                };
 
                 let items = match &collection {
                     Value::Set(s) => s.clone(),
@@ -386,7 +399,20 @@ impl<'a> Checker<'a> {
                 }
 
                 let binding = &bindings[0];
-                let collection = self.evaluate(&binding.collection, env, state)?;
+
+                // Get the collection from the binding
+                let collection = match &binding.kind {
+                    QuantBindingKind::InCollection(coll_expr) => {
+                        self.evaluate(coll_expr, env, state)?
+                    }
+                    QuantBindingKind::Typed(_) => {
+                        // Typed quantifiers can't be evaluated at runtime
+                        // (we can't enumerate all values of a type)
+                        return Err(
+                            "typed quantifiers cannot be evaluated at runtime".to_string(),
+                        );
+                    }
+                };
 
                 let items = match &collection {
                     Value::Set(s) => s.clone(),

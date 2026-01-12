@@ -9,10 +9,6 @@ use smol_str::SmolStr;
 #[logos(skip r"//[^\n]*")]
 pub enum Token {
     // ========== Keywords ==========
-    /// `module` keyword
-    #[token("module")]
-    Module,
-
     /// `use` keyword for imports
     #[token("use")]
     Use,
@@ -53,18 +49,6 @@ pub enum Token {
     #[token("scenario")]
     Scenario,
 
-    /// `given` keyword
-    #[token("given")]
-    Given,
-
-    /// `when` keyword
-    #[token("when")]
-    When,
-
-    /// `then` keyword
-    #[token("then")]
-    Then,
-
     /// `alt` keyword for alternative flows
     #[token("alt")]
     Alt,
@@ -72,38 +56,6 @@ pub enum Token {
     /// `quality` keyword for non-functional requirements
     #[token("quality")]
     Quality,
-
-    /// `performance` quality category
-    #[token("performance")]
-    Performance,
-
-    /// `reliability` quality category
-    #[token("reliability")]
-    Reliability,
-
-    /// `security` quality category
-    #[token("security")]
-    Security,
-
-    /// `usability` quality category
-    #[token("usability")]
-    Usability,
-
-    /// `scalability` quality category
-    #[token("scalability")]
-    Scalability,
-
-    /// `maintainability` quality category
-    #[token("maintainability")]
-    Maintainability,
-
-    /// `metric` keyword for quality metrics
-    #[token("metric")]
-    Metric,
-
-    /// `target` keyword for quality targets
-    #[token("target")]
-    Target,
 
     /// `property` keyword
     #[token("property")]
@@ -228,39 +180,6 @@ pub enum Token {
     /// `None` option variant
     #[token("None")]
     None,
-
-    // ========== Built-in types ==========
-    /// `Set` type
-    #[token("Set")]
-    SetType,
-
-    /// `Map` type
-    #[token("Map")]
-    MapType,
-
-    /// `List` type
-    #[token("List")]
-    ListType,
-
-    /// `Option` type
-    #[token("Option")]
-    OptionType,
-
-    /// `Result` type
-    #[token("Result")]
-    ResultType,
-
-    /// `String` type
-    #[token("String")]
-    StringType,
-
-    /// `Int` type
-    #[token("Int")]
-    IntType,
-
-    /// `Bool` type
-    #[token("Bool")]
-    BoolType,
 
     // ========== Punctuation ==========
     /// `{`
@@ -416,7 +335,6 @@ pub enum Token {
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Token::Module => write!(f, "module"),
             Token::Use => write!(f, "use"),
             Token::Type => write!(f, "type"),
             Token::Enum => write!(f, "enum"),
@@ -427,19 +345,8 @@ impl std::fmt::Display for Token {
             Token::Requires => write!(f, "requires"),
             Token::Ensures => write!(f, "ensures"),
             Token::Scenario => write!(f, "scenario"),
-            Token::Given => write!(f, "given"),
-            Token::When => write!(f, "when"),
-            Token::Then => write!(f, "then"),
             Token::Alt => write!(f, "alt"),
             Token::Quality => write!(f, "quality"),
-            Token::Performance => write!(f, "performance"),
-            Token::Reliability => write!(f, "reliability"),
-            Token::Security => write!(f, "security"),
-            Token::Usability => write!(f, "usability"),
-            Token::Scalability => write!(f, "scalability"),
-            Token::Maintainability => write!(f, "maintainability"),
-            Token::Metric => write!(f, "metric"),
-            Token::Target => write!(f, "target"),
             Token::Property => write!(f, "property"),
             Token::Always => write!(f, "always"),
             Token::Eventually => write!(f, "eventually"),
@@ -470,14 +377,6 @@ impl std::fmt::Display for Token {
             Token::Err => write!(f, "Err"),
             Token::Some => write!(f, "Some"),
             Token::None => write!(f, "None"),
-            Token::SetType => write!(f, "Set"),
-            Token::MapType => write!(f, "Map"),
-            Token::ListType => write!(f, "List"),
-            Token::OptionType => write!(f, "Option"),
-            Token::ResultType => write!(f, "Result"),
-            Token::StringType => write!(f, "String"),
-            Token::IntType => write!(f, "Int"),
-            Token::BoolType => write!(f, "Bool"),
             Token::LBrace => write!(f, "{{"),
             Token::RBrace => write!(f, "}}"),
             Token::LParen => write!(f, "("),
@@ -528,7 +427,8 @@ mod tests {
 
     #[test]
     fn test_keywords() {
-        assert_eq!(lex("module"), vec![Token::Module]);
+        // 'module' is now contextual (identifier)
+        assert_eq!(lex("module"), vec![Token::Ident("module".into())]);
         assert_eq!(lex("use"), vec![Token::Use]);
         assert_eq!(lex("type"), vec![Token::Type]);
         assert_eq!(lex("enum"), vec![Token::Enum]);
@@ -627,11 +527,12 @@ mod tests {
 
     #[test]
     fn test_generic_types() {
+        // Built-in types are now lexed as identifiers
         let tokens = lex("Set<User>");
         assert_eq!(
             tokens,
             vec![
-                Token::SetType,
+                Token::Ident("Set".into()),
                 Token::LAngle,
                 Token::Ident("User".into()),
                 Token::RAngle,
@@ -642,11 +543,11 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                Token::MapType,
+                Token::Ident("Map".into()),
                 Token::LAngle,
-                Token::StringType,
+                Token::Ident("String".into()),
                 Token::Comma,
-                Token::IntType,
+                Token::Ident("Int".into()),
                 Token::RAngle,
             ]
         );
@@ -674,28 +575,40 @@ mod tests {
 
     #[test]
     fn test_scenario_keywords() {
+        // given, when, then are now contextual (identifiers)
         let tokens = lex("scenario given when then alt");
         assert_eq!(
             tokens,
-            vec![Token::Scenario, Token::Given, Token::When, Token::Then, Token::Alt]
+            vec![
+                Token::Scenario,
+                Token::Ident("given".into()),
+                Token::Ident("when".into()),
+                Token::Ident("then".into()),
+                Token::Alt,
+            ]
         );
     }
 
     #[test]
     fn test_quality_keywords() {
+        // Only 'quality' is a keyword; category names are now identifiers
         let tokens = lex("quality performance reliability security scalability");
         assert_eq!(
             tokens,
             vec![
                 Token::Quality,
-                Token::Performance,
-                Token::Reliability,
-                Token::Security,
-                Token::Scalability,
+                Token::Ident("performance".into()),
+                Token::Ident("reliability".into()),
+                Token::Ident("security".into()),
+                Token::Ident("scalability".into()),
             ]
         );
+        // metric and target are now identifiers (contextual in quality blocks)
         let tokens = lex("metric target");
-        assert_eq!(tokens, vec![Token::Metric, Token::Target]);
+        assert_eq!(
+            tokens,
+            vec![Token::Ident("metric".into()), Token::Ident("target".into())]
+        );
     }
 
     #[test]
@@ -739,7 +652,7 @@ mod tests {
                 Token::Ident("Email".into()),
                 Token::RParen,
                 Token::Arrow,
-                Token::ResultType,
+                Token::Ident("Result".into()),
                 Token::LAngle,
                 Token::Ident("User".into()),
                 Token::Comma,
