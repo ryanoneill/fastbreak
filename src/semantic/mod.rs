@@ -4,12 +4,15 @@
 //! - Name resolution (resolving references to definitions)
 //! - Type checking (verifying type consistency)
 //! - Validation (checking semantic constraints)
+//! - Module tracking (for multi-file specifications)
 
 mod error;
+mod modules;
 mod scope;
 mod types;
 
 pub use error::{Diagnostics, SemanticError, SemanticResult};
+pub use modules::{ImportedItem, ModuleInfo, ModuleRegistry, QualifiedName, ResolvedImport};
 pub use scope::{ScopeKind, Symbol, SymbolKind, SymbolTable, TypeRegistry};
 pub use types::{
     ActionInfo, EnumInfo, RelationInfo, StateInfo, StructInfo, Type, TypeId, TypeVarId,

@@ -6,7 +6,7 @@ use super::manifest::{Manifest, ManifestError};
 use crate::ast::Specification;
 use crate::model::{compile, CompiledSpec};
 use crate::parser::{self, ParseError};
-use crate::semantic::{self, Analyzer};
+use crate::semantic::{self, Analyzer, ModuleRegistry};
 use indexmap::IndexMap;
 use smol_str::SmolStr;
 use std::path::{Path, PathBuf};
@@ -27,6 +27,8 @@ pub struct Project {
     pub spec: CompiledSpec,
     /// Semantic analyzer results
     pub analyzer: Analyzer,
+    /// Module registry for tracking definitions across files
+    pub modules: ModuleRegistry,
 }
 
 impl Project {
@@ -134,6 +136,9 @@ impl Loader {
 
         let module = ast.module.as_ref().map(|m| m.name.name.clone());
 
+        // Build module registry from the AST
+        let modules = ModuleRegistry::from_spec(&ast);
+
         let analyzer = semantic::analyze(&ast);
         let spec = compile(&ast, &analyzer);
 
@@ -166,6 +171,7 @@ impl Loader {
             sources,
             spec,
             analyzer,
+            modules,
         })
     }
 
@@ -206,14 +212,11 @@ impl Loader {
             );
         }
 
-        // Combine all ASTs and analyze
-        // For now, we just use the first file's AST
-        // TODO: Implement proper multi-file merging with import resolution
-        let combined_ast = if let Some(first) = sources.values().next() {
-            first.ast.clone()
-        } else {
-            Specification::default()
-        };
+        // Merge all ASTs into a combined specification
+        let combined_ast = Self::merge_specifications(&sources);
+
+        // Build module registry from the combined AST
+        let modules = ModuleRegistry::from_spec(&combined_ast);
 
         let analyzer = semantic::analyze(&combined_ast);
         let spec = compile(&combined_ast, &analyzer);
@@ -224,6 +227,7 @@ impl Loader {
             sources,
             spec,
             analyzer,
+            modules,
         })
     }
 
@@ -268,6 +272,52 @@ impl Loader {
         }
 
         Ok(())
+    }
+
+    /// Merge multiple source files into a combined specification
+    fn merge_specifications(sources: &IndexMap<PathBuf, SourceFile>) -> Specification {
+        let mut combined = Specification::new();
+
+        for source_file in sources.values() {
+            let spec = &source_file.ast;
+
+            // Use the first module declaration found
+            if combined.module.is_none() {
+                combined.module.clone_from(&spec.module);
+            }
+
+            // Merge all imports
+            combined.imports.extend(spec.imports.iter().cloned());
+
+            // Merge all type definitions
+            combined.types.extend(spec.types.iter().cloned());
+
+            // Merge all type aliases
+            combined.type_aliases.extend(spec.type_aliases.iter().cloned());
+
+            // Merge all enums
+            combined.enums.extend(spec.enums.iter().cloned());
+
+            // Merge all relations
+            combined.relations.extend(spec.relations.iter().cloned());
+
+            // Merge all states
+            combined.states.extend(spec.states.iter().cloned());
+
+            // Merge all actions
+            combined.actions.extend(spec.actions.iter().cloned());
+
+            // Merge all scenarios
+            combined.scenarios.extend(spec.scenarios.iter().cloned());
+
+            // Merge all properties
+            combined.properties.extend(spec.properties.iter().cloned());
+
+            // Merge all qualities
+            combined.qualities.extend(spec.qualities.iter().cloned());
+        }
+
+        combined
     }
 }
 
@@ -439,5 +489,158 @@ mod tests {
         let project = Loader::load_project(&manifest_path).unwrap();
 
         assert_eq!(project.sources.len(), 3);
+    }
+
+    #[test]
+    fn test_merge_multiple_files() {
+        let dir = TempDir::new().unwrap();
+
+        // Create manifest
+        let manifest = Manifest::new("merge-project");
+        manifest.save(&dir.path().join("fastbreak.toml")).unwrap();
+
+        // Create source directory
+        fs::create_dir(dir.path().join("specs")).unwrap();
+
+        // Create first file with a type
+        fs::write(
+            dir.path().join("specs/types.fbs"),
+            r#"
+                type User {
+                    id: Int,
+                    name: String,
+                }
+
+                type Product {
+                    id: Int,
+                    name: String,
+                }
+            "#,
+        )
+        .unwrap();
+
+        // Create second file with an enum and action
+        fs::write(
+            dir.path().join("specs/actions.fbs"),
+            r#"
+                enum Status { Active, Inactive }
+
+                action create_user(name: String) -> Bool
+            "#,
+        )
+        .unwrap();
+
+        // Create third file with a scenario
+        fs::write(
+            dir.path().join("specs/scenarios.fbs"),
+            r#"
+                scenario "test scenario" {
+                    given { x = 1 }
+                    when { y = x + 1 }
+                    then { y == 2 }
+                }
+            "#,
+        )
+        .unwrap();
+
+        let manifest_path = dir.path().join("fastbreak.toml");
+        let project = Loader::load_project(&manifest_path).unwrap();
+
+        // Verify all definitions were merged
+        assert_eq!(project.sources.len(), 3);
+        assert_eq!(project.spec.structs.len(), 2); // User and Product
+        assert_eq!(project.spec.enums.len(), 1); // Status
+        assert_eq!(project.spec.actions.len(), 1); // create_user
+        assert_eq!(project.spec.scenarios.len(), 1); // test scenario
+    }
+
+    #[test]
+    fn test_cross_file_type_references() {
+        let dir = TempDir::new().unwrap();
+
+        // Create manifest
+        let manifest = Manifest::new("cross-ref-project");
+        manifest.save(&dir.path().join("fastbreak.toml")).unwrap();
+
+        // Create source directory
+        fs::create_dir(dir.path().join("specs")).unwrap();
+
+        // Create file with base types
+        fs::write(
+            dir.path().join("specs/01_types.fbs"),
+            r#"
+                type User {
+                    id: Int,
+                    name: String,
+                }
+            "#,
+        )
+        .unwrap();
+
+        // Create file that references the User type
+        fs::write(
+            dir.path().join("specs/02_actions.fbs"),
+            r#"
+                action create_user(name: String) -> User
+            "#,
+        )
+        .unwrap();
+
+        let manifest_path = dir.path().join("fastbreak.toml");
+        let project = Loader::load_project(&manifest_path).unwrap();
+
+        // Verify both definitions are present
+        assert_eq!(project.spec.structs.len(), 1);
+        assert_eq!(project.spec.actions.len(), 1);
+
+        // Verify the module registry tracks the type
+        assert!(project.modules.is_type_available("User"));
+
+        // Verify there are no semantic errors (cross-file reference should work)
+        assert!(
+            !project.has_errors(),
+            "Should not have errors: {:?}",
+            project.errors()
+        );
+    }
+
+    #[test]
+    fn test_module_info_from_multi_file() {
+        let dir = TempDir::new().unwrap();
+
+        // Create manifest
+        let manifest = Manifest::new("module-info-project");
+        manifest.save(&dir.path().join("fastbreak.toml")).unwrap();
+
+        // Create source directory
+        fs::create_dir(dir.path().join("specs")).unwrap();
+
+        // Create first file
+        fs::write(
+            dir.path().join("specs/a.fbs"),
+            r#"
+                type TypeA { id: Int }
+                enum EnumA { X, Y }
+            "#,
+        )
+        .unwrap();
+
+        // Create second file
+        fs::write(
+            dir.path().join("specs/b.fbs"),
+            r#"
+                type TypeB { name: String }
+                action do_something(x: Int) -> Bool
+            "#,
+        )
+        .unwrap();
+
+        let manifest_path = dir.path().join("fastbreak.toml");
+        let project = Loader::load_project(&manifest_path).unwrap();
+
+        // Verify module registry has all types
+        assert!(project.modules.is_type_available("TypeA"));
+        assert!(project.modules.is_type_available("TypeB"));
+        assert!(project.modules.is_enum_available("EnumA"));
     }
 }
