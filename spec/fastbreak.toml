@@ -1,6 +1,7 @@
 [project]
-name = "fastbreak-spec"
+name = "fastbreak"
 version = "0.1.0"
+description = "Fastbreak language self-specification"
 authors = []
 
 [source]
