@@ -128,6 +128,31 @@ pub enum SemanticError {
         #[label("patterns not covered")]
         span: Span,
     },
+
+    /// Duplicate @id attribute value
+    #[error("duplicate @id: `{id}`")]
+    DuplicateId {
+        /// The duplicated ID value
+        id: String,
+        /// Location of the duplicate
+        #[label("duplicate @id")]
+        span: Span,
+        /// Location of the original
+        #[label("original @id defined here")]
+        original_span: Span,
+    },
+
+    /// Unknown reference in attribute
+    #[error("unknown reference in @{attr_name}: `{reference}`")]
+    UnknownReference {
+        /// The attribute name
+        attr_name: String,
+        /// The unknown reference
+        reference: String,
+        /// Location
+        #[label("unknown reference")]
+        span: Span,
+    },
 }
 
 impl SemanticError {
@@ -200,7 +225,9 @@ impl SemanticError {
             | SemanticError::CyclicDependency { span, .. }
             | SemanticError::Missing { span, .. }
             | SemanticError::InvalidPattern { span, .. }
-            | SemanticError::NonExhaustive { span, .. } => *span,
+            | SemanticError::NonExhaustive { span, .. }
+            | SemanticError::DuplicateId { span, .. }
+            | SemanticError::UnknownReference { span, .. } => *span,
         }
     }
 }

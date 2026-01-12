@@ -3,11 +3,74 @@
 //! This module defines the fully resolved specification model that is ready
 //! for code generation, documentation, and verification.
 
+use crate::ast::{Attribute, AttributeArg};
 use crate::semantic::{ActionInfo, EnumInfo, RelationInfo, StateInfo, StructInfo, Type};
 use crate::Span;
 use indexmap::IndexMap;
 use smol_str::SmolStr;
 use std::sync::Arc;
+
+/// A compiled attribute
+#[derive(Debug, Clone)]
+pub struct CompiledAttribute {
+    /// Attribute name
+    pub name: SmolStr,
+    /// Attribute arguments
+    pub args: Vec<CompiledAttributeArg>,
+}
+
+/// A compiled attribute argument
+#[derive(Debug, Clone)]
+pub enum CompiledAttributeArg {
+    /// String value
+    String(SmolStr),
+    /// Identifier value
+    Ident(SmolStr),
+    /// Integer value
+    Int(i64),
+}
+
+impl CompiledAttribute {
+    /// Create from AST `Attribute`
+    #[must_use]
+    pub fn from_ast(attr: &Attribute) -> Self {
+        Self {
+            name: attr.name.name.clone(),
+            args: attr.args.iter().map(CompiledAttributeArg::from_ast).collect(),
+        }
+    }
+
+    /// Get the first argument as a string if it exists
+    #[must_use]
+    pub fn first_arg_string(&self) -> Option<&str> {
+        self.args.first().and_then(|arg| match arg {
+            CompiledAttributeArg::String(s) | CompiledAttributeArg::Ident(s) => Some(s.as_str()),
+            CompiledAttributeArg::Int(_) => None,
+        })
+    }
+}
+
+impl CompiledAttributeArg {
+    /// Create from AST `AttributeArg`
+    #[must_use]
+    pub fn from_ast(arg: &AttributeArg) -> Self {
+        match arg {
+            AttributeArg::String(s, _) => CompiledAttributeArg::String(s.clone()),
+            AttributeArg::Ident(ident) => CompiledAttributeArg::Ident(ident.name.clone()),
+            AttributeArg::Int(n, _) => CompiledAttributeArg::Int(*n),
+        }
+    }
+}
+
+impl std::fmt::Display for CompiledAttributeArg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CompiledAttributeArg::String(s) => write!(f, "\"{s}\""),
+            CompiledAttributeArg::Ident(s) => write!(f, "{s}"),
+            CompiledAttributeArg::Int(n) => write!(f, "{n}"),
+        }
+    }
+}
 
 /// A fully compiled and resolved specification
 #[derive(Debug, Clone)]
@@ -98,6 +161,8 @@ pub struct CompiledStruct {
     pub type_params: Vec<SmolStr>,
     /// Fields with their resolved types
     pub fields: IndexMap<SmolStr, Type>,
+    /// Attributes
+    pub attributes: Vec<CompiledAttribute>,
     /// Documentation comment
     pub doc: Option<String>,
     /// Source span
@@ -107,11 +172,12 @@ pub struct CompiledStruct {
 impl CompiledStruct {
     /// Create from semantic `StructInfo`
     #[must_use]
-    pub fn from_info(info: &StructInfo, span: Span) -> Self {
+    pub fn from_info(info: &StructInfo, attributes: Vec<CompiledAttribute>, span: Span) -> Self {
         Self {
             name: info.id.name.clone(),
             type_params: info.type_params.clone(),
             fields: info.fields.clone(),
+            attributes,
             doc: None,
             span,
         }
@@ -127,6 +193,8 @@ pub struct CompiledEnum {
     pub type_params: Vec<SmolStr>,
     /// Variants
     pub variants: IndexMap<SmolStr, CompiledVariant>,
+    /// Attributes
+    pub attributes: Vec<CompiledAttribute>,
     /// Documentation comment
     pub doc: Option<String>,
     /// Source span
@@ -136,7 +204,7 @@ pub struct CompiledEnum {
 impl CompiledEnum {
     /// Create from semantic `EnumInfo`
     #[must_use]
-    pub fn from_info(info: &EnumInfo, span: Span) -> Self {
+    pub fn from_info(info: &EnumInfo, attributes: Vec<CompiledAttribute>, span: Span) -> Self {
         let variants = info
             .variants
             .iter()
@@ -156,6 +224,7 @@ impl CompiledEnum {
             name: info.id.name.clone(),
             type_params: info.type_params.clone(),
             variants,
+            attributes,
             doc: None,
             span,
         }
@@ -190,6 +259,8 @@ pub struct CompiledState {
     pub fields: IndexMap<SmolStr, Type>,
     /// State invariants
     pub invariants: Vec<CompiledInvariant>,
+    /// Attributes
+    pub attributes: Vec<CompiledAttribute>,
     /// Documentation comment
     pub doc: Option<String>,
     /// Source span
@@ -199,11 +270,12 @@ pub struct CompiledState {
 impl CompiledState {
     /// Create from semantic `StateInfo`
     #[must_use]
-    pub fn from_info(info: &StateInfo, span: Span) -> Self {
+    pub fn from_info(info: &StateInfo, attributes: Vec<CompiledAttribute>, span: Span) -> Self {
         Self {
             name: info.name.clone(),
             fields: info.fields.clone(),
             invariants: Vec::new(),
+            attributes,
             doc: None,
             span,
         }
@@ -234,6 +306,8 @@ pub struct CompiledAction {
     pub requires: Vec<CompiledContract>,
     /// Postconditions (ensures clauses)
     pub ensures: Vec<CompiledContract>,
+    /// Attributes
+    pub attributes: Vec<CompiledAttribute>,
     /// Documentation comment
     pub doc: Option<String>,
     /// Source span
@@ -243,13 +317,14 @@ pub struct CompiledAction {
 impl CompiledAction {
     /// Create from semantic `ActionInfo`
     #[must_use]
-    pub fn from_info(info: &ActionInfo, span: Span) -> Self {
+    pub fn from_info(info: &ActionInfo, attributes: Vec<CompiledAttribute>, span: Span) -> Self {
         Self {
             name: info.name.clone(),
             params: info.params.clone(),
             return_type: info.return_type.clone(),
             requires: Vec::new(),
             ensures: Vec::new(),
+            attributes,
             doc: None,
             span,
         }
@@ -276,6 +351,8 @@ pub struct CompiledRelation {
     pub target: Type,
     /// Relation properties
     pub properties: Vec<RelationProperty>,
+    /// Attributes
+    pub attributes: Vec<CompiledAttribute>,
     /// Documentation comment
     pub doc: Option<String>,
     /// Source span
@@ -285,12 +362,13 @@ pub struct CompiledRelation {
 impl CompiledRelation {
     /// Create from semantic `RelationInfo`
     #[must_use]
-    pub fn from_info(info: &RelationInfo, span: Span) -> Self {
+    pub fn from_info(info: &RelationInfo, attributes: Vec<CompiledAttribute>, span: Span) -> Self {
         Self {
             name: info.name.clone(),
             source: info.source.clone(),
             target: info.target.clone(),
             properties: Vec::new(),
+            attributes,
             doc: None,
             span,
         }
@@ -323,6 +401,8 @@ pub struct CompiledScenario {
     pub when: Vec<CompiledWhen>,
     /// Then clauses (expected outcomes)
     pub then: Vec<CompiledThen>,
+    /// Attributes
+    pub attributes: Vec<CompiledAttribute>,
     /// Documentation comment
     pub doc: Option<String>,
     /// Source span
@@ -396,6 +476,8 @@ pub struct CompiledProperty {
     pub expr: Arc<crate::ast::Expr>,
     /// Temporal operator (if any)
     pub temporal: Option<TemporalOp>,
+    /// Attributes
+    pub attributes: Vec<CompiledAttribute>,
     /// Documentation comment
     pub doc: Option<String>,
     /// Source span

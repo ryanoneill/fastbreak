@@ -13,10 +13,10 @@ mod state;
 
 pub use checker::{CheckResult, Checker, Counterexample};
 pub use spec::{
-    CompiledAction, CompiledAssignment, CompiledAssertion, CompiledContract, CompiledEnum,
-    CompiledGiven, CompiledInvariant, CompiledProperty, CompiledRelation, CompiledScenario,
-    CompiledSpec, CompiledState, CompiledStruct, CompiledThen, CompiledVariant, CompiledWhen,
-    CompiledWhenAction, Import, RelationProperty, TemporalOp,
+    CompiledAction, CompiledAssignment, CompiledAssertion, CompiledAttribute, CompiledAttributeArg,
+    CompiledContract, CompiledEnum, CompiledGiven, CompiledInvariant, CompiledProperty,
+    CompiledRelation, CompiledScenario, CompiledSpec, CompiledState, CompiledStruct, CompiledThen,
+    CompiledVariant, CompiledWhen, CompiledWhenAction, Import, RelationProperty, TemporalOp,
 };
 pub use state::{Environment, StateSnapshot, Trace, Value};
 
@@ -50,6 +50,11 @@ impl<'a> SpecBuilder<'a> {
             analyzer,
             spec: CompiledSpec::new(),
         }
+    }
+
+    /// Convert AST attributes to compiled attributes
+    fn compile_attributes(attrs: &[ast::Attribute]) -> Vec<spec::CompiledAttribute> {
+        attrs.iter().map(spec::CompiledAttribute::from_ast).collect()
     }
 
     /// Build the compiled specification
@@ -104,7 +109,8 @@ impl<'a> SpecBuilder<'a> {
         for type_def in types {
             let name = &type_def.name.name;
             if let Some(info) = registry.get_struct(name) {
-                let compiled = CompiledStruct::from_info(info, type_def.span);
+                let attrs = Self::compile_attributes(&type_def.attributes);
+                let compiled = CompiledStruct::from_info(info, attrs, type_def.span);
                 self.spec.structs.insert(name.clone(), compiled);
             }
         }
@@ -114,7 +120,8 @@ impl<'a> SpecBuilder<'a> {
         for enum_def in enums {
             let name = &enum_def.name.name;
             if let Some(info) = registry.get_enum(name) {
-                let compiled = CompiledEnum::from_info(info, enum_def.span);
+                let attrs = Self::compile_attributes(&enum_def.attributes);
+                let compiled = CompiledEnum::from_info(info, attrs, enum_def.span);
                 self.spec.enums.insert(name.clone(), compiled);
             }
         }
@@ -125,7 +132,8 @@ impl<'a> SpecBuilder<'a> {
             let name = &state.name.name;
 
             if let Some(info) = self.analyzer.types.get_state(name) {
-                let mut compiled = CompiledState::from_info(info, state.span);
+                let attrs = Self::compile_attributes(&state.attributes);
+                let mut compiled = CompiledState::from_info(info, attrs, state.span);
 
                 // Build invariants
                 for invariant in &state.invariants {
@@ -146,7 +154,8 @@ impl<'a> SpecBuilder<'a> {
             let name = &action.name.name;
 
             if let Some(info) = self.analyzer.types.get_action(name) {
-                let mut compiled = CompiledAction::from_info(info, action.span);
+                let attrs = Self::compile_attributes(&action.attributes);
+                let mut compiled = CompiledAction::from_info(info, attrs, action.span);
 
                 // Build contracts from action.contracts
                 for contract in &action.contracts {
@@ -170,7 +179,8 @@ impl<'a> SpecBuilder<'a> {
             let name = &relation.name.name;
 
             if let Some(info) = self.analyzer.types.get_relation(name) {
-                let mut compiled = CompiledRelation::from_info(info, relation.span);
+                let attrs = Self::compile_attributes(&relation.attributes);
+                let mut compiled = CompiledRelation::from_info(info, attrs, relation.span);
 
                 // Build relation properties from constraints
                 for constraint in &relation.constraints {
@@ -196,6 +206,7 @@ impl<'a> SpecBuilder<'a> {
                 given: vec![Self::build_given(&scenario.given)],
                 when: vec![Self::build_when(&scenario.when)],
                 then: vec![Self::build_then(&scenario.then)],
+                attributes: Self::compile_attributes(&scenario.attributes),
                 doc: None,
                 span: scenario.span,
             };
@@ -266,6 +277,7 @@ impl<'a> SpecBuilder<'a> {
                 name: property.description.to_string(),
                 expr: Arc::new(property.expr.clone()),
                 temporal,
+                attributes: Self::compile_attributes(&property.attributes),
                 doc: None,
                 span: property.span,
             };

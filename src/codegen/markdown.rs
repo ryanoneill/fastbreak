@@ -3,8 +3,8 @@
 //! Generates comprehensive Markdown documentation from a compiled specification.
 
 use crate::model::{
-    CompiledAction, CompiledEnum, CompiledProperty, CompiledRelation, CompiledScenario,
-    CompiledSpec, CompiledState, CompiledStruct, RelationProperty, TemporalOp,
+    CompiledAction, CompiledAttribute, CompiledEnum, CompiledProperty, CompiledRelation,
+    CompiledScenario, CompiledSpec, CompiledState, CompiledStruct, RelationProperty, TemporalOp,
 };
 use crate::semantic::Type;
 use std::fmt::Write;
@@ -112,6 +112,9 @@ impl<'a> MarkdownGenerator<'a> {
             writeln!(self.output, "### `{name}<{params}>`\n").unwrap();
         }
 
+        // Attributes
+        self.format_attributes(&struct_def.attributes);
+
         // Documentation
         if let Some(doc) = &struct_def.doc {
             writeln!(self.output, "{doc}\n").unwrap();
@@ -149,6 +152,9 @@ impl<'a> MarkdownGenerator<'a> {
             let params = enum_def.type_params.join(", ");
             writeln!(self.output, "### `{name}<{params}>`\n").unwrap();
         }
+
+        // Attributes
+        self.format_attributes(&enum_def.attributes);
 
         // Documentation
         if let Some(doc) = &enum_def.doc {
@@ -195,6 +201,9 @@ impl<'a> MarkdownGenerator<'a> {
 
     fn generate_state(&mut self, name: &str, state_def: &CompiledState) {
         writeln!(self.output, "### `{name}`\n").unwrap();
+
+        // Attributes
+        self.format_attributes(&state_def.attributes);
 
         // Documentation
         if let Some(doc) = &state_def.doc {
@@ -251,6 +260,9 @@ impl<'a> MarkdownGenerator<'a> {
 
         writeln!(self.output, "### `{name}({params_str}) -> {return_type}`\n").unwrap();
 
+        // Attributes
+        self.format_attributes(&action_def.attributes);
+
         // Documentation
         if let Some(doc) = &action_def.doc {
             writeln!(self.output, "{doc}\n").unwrap();
@@ -295,6 +307,9 @@ impl<'a> MarkdownGenerator<'a> {
 
         writeln!(self.output, "### `{name}: {source} -> {target}`\n").unwrap();
 
+        // Attributes
+        self.format_attributes(&relation_def.attributes);
+
         // Documentation
         if let Some(doc) = &relation_def.doc {
             writeln!(self.output, "{doc}\n").unwrap();
@@ -331,6 +346,9 @@ impl<'a> MarkdownGenerator<'a> {
 
     fn generate_scenario(&mut self, index: usize, scenario: &CompiledScenario) {
         writeln!(self.output, "### Scenario {}: {}\n", index, scenario.name).unwrap();
+
+        // Attributes
+        self.format_attributes(&scenario.attributes);
 
         // Documentation
         if let Some(doc) = &scenario.doc {
@@ -388,6 +406,9 @@ impl<'a> MarkdownGenerator<'a> {
     fn generate_property(&mut self, index: usize, property: &CompiledProperty) {
         writeln!(self.output, "### Property {}: {}\n", index, property.name).unwrap();
 
+        // Attributes
+        self.format_attributes(&property.attributes);
+
         // Documentation
         if let Some(doc) = &property.doc {
             writeln!(self.output, "{doc}\n").unwrap();
@@ -403,6 +424,23 @@ impl<'a> MarkdownGenerator<'a> {
             };
             writeln!(self.output, "**Type:** {op_name}\n").unwrap();
         }
+    }
+
+    fn format_attributes(&mut self, attrs: &[CompiledAttribute]) {
+        if attrs.is_empty() {
+            return;
+        }
+
+        writeln!(self.output, "**Attributes:**\n").unwrap();
+        for attr in attrs {
+            if attr.args.is_empty() {
+                writeln!(self.output, "- `@{}`", attr.name).unwrap();
+            } else {
+                let args: Vec<String> = attr.args.iter().map(ToString::to_string).collect();
+                writeln!(self.output, "- `@{}({})`", attr.name, args.join(", ")).unwrap();
+            }
+        }
+        writeln!(self.output).unwrap();
     }
 
     fn format_type(ty: &Type) -> String {
@@ -611,5 +649,29 @@ mod tests {
         assert!(output.contains("## Properties"));
         assert!(output.contains("### Property 1: always positive"));
         assert!(output.contains("**Type:** Always (invariant)"));
+    }
+
+    #[test]
+    fn test_generate_with_attributes() {
+        let source = r#"
+            @id(REQ001)
+            @rationale("Core user type for authentication")
+            type User {
+                id: Int,
+                name: String,
+            }
+        "#;
+
+        let spec = parse(source).unwrap();
+        let analyzer = semantic::analyze(&spec);
+        let compiled = compile(&spec, &analyzer);
+
+        let generator = MarkdownGenerator::new(&compiled);
+        let output = generator.generate();
+
+        assert!(output.contains("### `User`"));
+        assert!(output.contains("**Attributes:**"));
+        assert!(output.contains("- `@id(REQ001)`"));
+        assert!(output.contains("- `@rationale(\"Core user type for authentication\")`"));
     }
 }

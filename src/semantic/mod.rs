@@ -17,10 +17,12 @@ pub use types::{
 };
 
 use crate::ast::{
-    Action, BinaryOp, BuiltInType, EnumDef, Expr, ExprKind, Literal, Pattern, PatternKind,
-    Relation, Scenario, Specification, StateBlock, TypeDef, TypeRef, TypeRefKind, UnaryOp,
+    Action, Attribute, AttributeArg, BinaryOp, BuiltInType, EnumDef, Expr, ExprKind, Literal,
+    Pattern, PatternKind, Relation, Scenario, Specification, StateBlock, TypeDef, TypeRef,
+    TypeRefKind, UnaryOp,
 };
 use crate::Span;
+use indexmap::IndexMap;
 use smol_str::SmolStr;
 use std::sync::Arc;
 
@@ -33,6 +35,8 @@ pub struct Analyzer {
     pub types: TypeRegistry,
     /// Collected diagnostics
     pub diagnostics: Diagnostics,
+    /// Registry of @id values to their spans (for duplicate detection)
+    id_registry: IndexMap<SmolStr, Span>,
 }
 
 impl Default for Analyzer {
@@ -49,6 +53,7 @@ impl Analyzer {
             symbols: SymbolTable::new(),
             types: TypeRegistry::new(),
             diagnostics: Diagnostics::new(),
+            id_registry: IndexMap::new(),
         }
     }
 
@@ -66,6 +71,9 @@ impl Analyzer {
         // Phase 4: Check scenarios and properties
         self.check_scenarios(spec);
         self.check_properties(spec);
+
+        // Phase 5: Validate attributes (IDs, references)
+        self.validate_all_attributes(spec);
     }
 
     /// Check if analysis succeeded (no errors)
@@ -486,6 +494,64 @@ impl Analyzer {
             let prop_type = self.check_expr(&property.expr);
             self.expect_type(&prop_type, &Type::Bool, property.expr.span);
             self.symbols.leave_scope();
+        }
+    }
+
+    // ========== Phase 5: Attribute Validation ==========
+
+    fn validate_all_attributes(&mut self, spec: &Specification) {
+        // Validate attributes on all constructs
+        for type_def in &spec.types {
+            self.validate_attributes(&type_def.attributes);
+        }
+        for enum_def in &spec.enums {
+            self.validate_attributes(&enum_def.attributes);
+        }
+        for relation in &spec.relations {
+            self.validate_attributes(&relation.attributes);
+        }
+        for state in &spec.states {
+            self.validate_attributes(&state.attributes);
+            for invariant in &state.invariants {
+                self.validate_attributes(&invariant.attributes);
+            }
+        }
+        for action in &spec.actions {
+            self.validate_attributes(&action.attributes);
+        }
+        for scenario in &spec.scenarios {
+            self.validate_attributes(&scenario.attributes);
+        }
+        for property in &spec.properties {
+            self.validate_attributes(&property.attributes);
+        }
+    }
+
+    fn validate_attributes(&mut self, attrs: &[Attribute]) {
+        for attr in attrs {
+            // Check for @id and validate uniqueness
+            if attr.name.as_str() == "id"
+                && let Some(arg) = attr.args.first()
+            {
+                let id_value = Self::extract_id_value(arg);
+                if let Some(existing_span) = self.id_registry.get(&id_value) {
+                    self.diagnostics.error(SemanticError::DuplicateId {
+                        id: id_value.to_string(),
+                        span: attr.span,
+                        original_span: *existing_span,
+                    });
+                } else {
+                    self.id_registry.insert(id_value, attr.span);
+                }
+            }
+        }
+    }
+
+    fn extract_id_value(arg: &AttributeArg) -> SmolStr {
+        match arg {
+            AttributeArg::String(s, _) => s.clone(),
+            AttributeArg::Ident(ident) => ident.name.clone(),
+            AttributeArg::Int(n, _) => SmolStr::new(n.to_string()),
         }
     }
 
@@ -1469,6 +1535,58 @@ mod tests {
                 names: List<String>,
                 lookup: Map<Int, String>
             }
+            "#,
+        );
+        assert!(analyzer.succeeded());
+    }
+
+    #[test]
+    fn test_analyze_attributes_valid() {
+        let analyzer = analyze_source(
+            r#"
+            @id(TYPE001)
+            @rationale("Test type")
+            type User { id: Int }
+
+            @id(STATE001)
+            state AppState {
+                users: Set<User>
+            }
+            "#,
+        );
+        assert!(analyzer.succeeded());
+    }
+
+    #[test]
+    fn test_analyze_duplicate_id() {
+        let analyzer = analyze_source(
+            r#"
+            @id(DUPLICATE)
+            type User { id: Int }
+
+            @id(DUPLICATE)
+            type Admin { id: Int }
+            "#,
+        );
+        assert!(!analyzer.succeeded());
+        // Should have the duplicate ID error plus potentially the duplicate type error
+        assert!(analyzer.diagnostics.errors().iter().any(|e| {
+            matches!(e, SemanticError::DuplicateId { id, .. } if id == "DUPLICATE")
+        }));
+    }
+
+    #[test]
+    fn test_analyze_unique_ids() {
+        let analyzer = analyze_source(
+            r#"
+            @id(TYPE001)
+            type User { id: Int }
+
+            @id(TYPE002)
+            type Admin { id: Int }
+
+            @id(ACTION001)
+            action create() -> User
             "#,
         );
         assert!(analyzer.succeeded());
