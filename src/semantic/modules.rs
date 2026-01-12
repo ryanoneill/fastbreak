@@ -226,13 +226,13 @@ impl ModuleRegistry {
         if path.len() == 1 {
             // Simple name - check current module
             let name = path[0];
-            if let Some(info) = self.current_module_info()
-                && (info.types.contains(name) || info.enums.contains(name))
-            {
-                return Some(QualifiedName {
-                    module: info.name.clone(),
-                    name: SmolStr::new(name),
-                });
+            if let Some(info) = self.current_module_info() {
+                if info.types.contains(name) || info.enums.contains(name) {
+                    return Some(QualifiedName {
+                        module: info.name.clone(),
+                        name: SmolStr::new(name),
+                    });
+                }
             }
             None
         } else {
@@ -241,13 +241,13 @@ impl ModuleRegistry {
             let name = path[path.len() - 1];
             let module_name = module_path.join("::");
 
-            if let Some(info) = self.modules.get(module_name.as_str())
-                && (info.types.contains(name) || info.enums.contains(name))
-            {
-                return Some(QualifiedName {
-                    module: SmolStr::new(module_name),
-                    name: SmolStr::new(name),
-                });
+            if let Some(info) = self.modules.get(module_name.as_str()) {
+                if info.types.contains(name) || info.enums.contains(name) {
+                    return Some(QualifiedName {
+                        module: SmolStr::new(module_name),
+                        name: SmolStr::new(name),
+                    });
+                }
             }
             None
         }

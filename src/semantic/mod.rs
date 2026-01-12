@@ -286,16 +286,16 @@ impl Analyzer {
     fn resolve_relation(&mut self, relation: &Relation) {
         let name = &relation.name.name;
 
-        if self.symbols.is_defined_locally(name)
-            && let Some(existing) = self.symbols.lookup(name)
-        {
-            self.diagnostics.error(SemanticError::duplicate(
-                "relation",
-                name.as_str(),
-                relation.name.span,
-                existing.span,
-            ));
-            return;
+        if self.symbols.is_defined_locally(name) {
+            if let Some(existing) = self.symbols.lookup(name) {
+                self.diagnostics.error(SemanticError::duplicate(
+                    "relation",
+                    name.as_str(),
+                    relation.name.span,
+                    existing.span,
+                ));
+                return;
+            }
         }
 
         let source = self.resolve_type(&relation.source);
@@ -314,16 +314,16 @@ impl Analyzer {
     fn resolve_state(&mut self, state: &StateBlock) {
         let name = &state.name.name;
 
-        if self.symbols.is_defined_locally(name)
-            && let Some(existing) = self.symbols.lookup(name)
-        {
-            self.diagnostics.error(SemanticError::duplicate(
-                "state",
-                name.as_str(),
-                state.name.span,
-                existing.span,
-            ));
-            return;
+        if self.symbols.is_defined_locally(name) {
+            if let Some(existing) = self.symbols.lookup(name) {
+                self.diagnostics.error(SemanticError::duplicate(
+                    "state",
+                    name.as_str(),
+                    state.name.span,
+                    existing.span,
+                ));
+                return;
+            }
         }
 
         self.symbols.define(Symbol::new(
@@ -365,16 +365,16 @@ impl Analyzer {
     fn resolve_action(&mut self, action: &Action) {
         let name = &action.name.name;
 
-        if self.symbols.is_defined_locally(name)
-            && let Some(existing) = self.symbols.lookup(name)
-        {
-            self.diagnostics.error(SemanticError::duplicate(
-                "action",
-                name.as_str(),
-                action.name.span,
-                existing.span,
-            ));
-            return;
+        if self.symbols.is_defined_locally(name) {
+            if let Some(existing) = self.symbols.lookup(name) {
+                self.diagnostics.error(SemanticError::duplicate(
+                    "action",
+                    name.as_str(),
+                    action.name.span,
+                    existing.span,
+                ));
+                return;
+            }
         }
 
         let return_type = action
@@ -577,12 +577,12 @@ impl Analyzer {
 
         // Check additional properties that might contain expressions
         for prop in &quality.properties {
-            if let crate::ast::QualityPropertyValue::Target(target) = &prop.value
-                && let QualityValue::Expr(expr) = &target.value
-            {
-                self.symbols.enter_scope(ScopeKind::Property);
-                let _expr_type = self.check_expr(expr);
-                self.symbols.leave_scope();
+            if let crate::ast::QualityPropertyValue::Target(target) = &prop.value {
+                if let QualityValue::Expr(expr) = &target.value {
+                    self.symbols.enter_scope(ScopeKind::Property);
+                    let _expr_type = self.check_expr(expr);
+                    self.symbols.leave_scope();
+                }
             }
         }
     }
@@ -623,18 +623,18 @@ impl Analyzer {
     fn validate_attributes(&mut self, attrs: &[Attribute]) {
         for attr in attrs {
             // Check for @id and validate uniqueness
-            if attr.name.as_str() == "id"
-                && let Some(arg) = attr.args.first()
-            {
-                let id_value = Self::extract_id_value(arg);
-                if let Some(existing_span) = self.id_registry.get(&id_value) {
-                    self.diagnostics.error(SemanticError::DuplicateId {
-                        id: id_value.to_string(),
-                        span: attr.span,
-                        original_span: *existing_span,
-                    });
-                } else {
-                    self.id_registry.insert(id_value, attr.span);
+            if attr.name.as_str() == "id" {
+                if let Some(arg) = attr.args.first() {
+                    let id_value = Self::extract_id_value(arg);
+                    if let Some(existing_span) = self.id_registry.get(&id_value) {
+                        self.diagnostics.error(SemanticError::DuplicateId {
+                            id: id_value.to_string(),
+                            span: attr.span,
+                            original_span: *existing_span,
+                        });
+                    } else {
+                        self.id_registry.insert(id_value, attr.span);
+                    }
                 }
             }
         }
@@ -912,10 +912,10 @@ impl Analyzer {
             }
             ExprKind::Result => {
                 // Look up result variable
-                if let Some(symbol) = self.symbols.lookup("result")
-                    && let SymbolKind::Variable(ty) = &symbol.kind
-                {
-                    return ty.clone();
+                if let Some(symbol) = self.symbols.lookup("result") {
+                    if let SymbolKind::Variable(ty) = &symbol.kind {
+                        return ty.clone();
+                    }
                 }
                 self.diagnostics.error(SemanticError::undefined(
                     "variable",
@@ -1062,10 +1062,10 @@ impl Analyzer {
 
         match &base_type {
             Type::Struct(id) => {
-                if let Some(info) = self.types.get_struct(&id.name)
-                    && let Some(field_type) = info.field(&field.name)
-                {
-                    return field_type.clone();
+                if let Some(info) = self.types.get_struct(&id.name) {
+                    if let Some(field_type) = info.field(&field.name) {
+                        return field_type.clone();
+                    }
                 }
                 self.diagnostics.error(SemanticError::undefined(
                     "field",

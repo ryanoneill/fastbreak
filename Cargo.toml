@@ -1,8 +1,8 @@
 [package]
 name = "fastbreak"
 version = "0.1.0"
-edition = "2024"
-rust-version = "1.85"
+edition = "2021"
+rust-version = "1.70"
 authors = ["Ryan O'Neill"]
 description = "A formal methods-inspired specification language combining Alloy, TLA+, Cucumber, and Design by Contract"
 license = "MIT"
