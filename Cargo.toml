@@ -2,11 +2,14 @@
 name = "fastbreak"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 authors = ["Ryan O'Neill"]
-description = "A formal methods-inspired specification language for documenting requirements"
+description = "A formal methods-inspired specification language combining Alloy, TLA+, Cucumber, and Design by Contract"
 license = "MIT"
+readme = "README.md"
 repository = "https://github.com/ryanoneill/fastbreak"
-keywords = ["specification", "formal-methods", "documentation"]
+homepage = "https://github.com/ryanoneill/fastbreak"
+keywords = ["specification", "formal-methods", "documentation", "dsl", "verification"]
 categories = ["development-tools", "command-line-utilities"]
 
 [[bin]]

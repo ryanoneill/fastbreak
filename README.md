@@ -10,14 +10,43 @@ Fastbreak provides a unified language for specifying software systems that is bo
 - **State machines** - System states, transitions, and invariants (TLA+-inspired)
 - **Scenarios** - Given/When/Then executable specifications (Cucumber-inspired)
 - **Contracts** - Preconditions, postconditions, and invariants (Design by Contract-inspired)
+- **Properties** - Temporal properties with always/eventually operators
+- **Quality requirements** - Non-functional requirements with measurable targets
+
+## Installation
+
+```bash
+cargo install fastbreak
+```
+
+Or build from source:
+
+```bash
+git clone https://github.com/ryanoneill/fastbreak.git
+cd fastbreak
+cargo build --release
+```
+
+## Quick Start
+
+```bash
+# Initialize a new project
+fastbreak init my-spec
+
+# Check specifications for errors
+fastbreak check
+
+# Build everything (check + generate docs + diagrams)
+fastbreak build
+```
 
 ## Language Syntax
 
-Fastbreak uses a Rust-like syntax with the `.fbs` file extension.
+Fastbreak uses a Rust-like syntax with the `.fbrk` file extension.
 
 ### Type Definitions
 
-```fbs
+```fbrk
 type User {
     id: UserId,
     email: Email,
@@ -31,9 +60,16 @@ enum UserStatus {
 }
 ```
 
+### Type Aliases with Refinements
+
+```fbrk
+type Email = String where self.contains("@")
+type PositiveInt = Int where self > 0
+```
+
 ### Relations
 
-```fbs
+```fbrk
 relation friends: User -> Set<User> {
     symmetric
     irreflexive
@@ -42,7 +78,7 @@ relation friends: User -> Set<User> {
 
 ### State Definitions
 
-```fbs
+```fbrk
 state AuthSystem {
     users: Set<User>,
     sessions: Map<SessionId, UserId>,
@@ -56,7 +92,7 @@ state AuthSystem {
 
 ### Actions with Contracts
 
-```fbs
+```fbrk
 action register(email: Email) -> Result<User, RegisterError>
     requires {
         not exists u in users where u.email == email
@@ -71,7 +107,7 @@ action register(email: Email) -> Result<User, RegisterError>
 
 ### Scenarios
 
-```fbs
+```fbrk
 scenario "New user registration" {
     given {
         users = {}
@@ -84,115 +120,141 @@ scenario "New user registration" {
         result is Ok
         users.len() == 1
     }
+
+    alt "Email already exists" when exists u in users where u.email == email {
+        then {
+            result is Err
+            users.len() == old_count
+        }
+    }
 }
 ```
 
 ### Properties
 
-```fbs
+```fbrk
 property "Users are unique by email" {
     always {
         forall u1, u2 in users where u1 != u2 =>
             u1.email != u2.email
     }
 }
+
+property "Parsing is deterministic" {
+    always {
+        forall source: String =>
+            parse(source) == parse(source)
+    }
+}
+```
+
+### Quality Requirements
+
+```fbrk
+@id("NFR-001")
+quality performance "API response time" {
+    metric: latency,
+    target: < 100ms,
+}
+
+@id("NFR-002")
+quality reliability "System uptime" {
+    metric: availability,
+    target: >= 99.9%,
+}
+```
+
+### Attributes for Traceability
+
+```fbrk
+@id("REQ-001")
+@rationale("Users must be uniquely identifiable")
+type User {
+    id: UserId,
+    name: String,
+}
+```
+
+## CLI Commands
+
+```bash
+# Initialize a new project
+fastbreak init <name> [--path <dir>]
+
+# Check specifications for errors
+fastbreak check [<file>]
+
+# Generate markdown documentation
+fastbreak doc [<file>]
+
+# Generate Mermaid diagrams
+fastbreak diagram [<file>] [--type <erd|state|sequence>]
+
+# Build everything (check + doc + diagram)
+fastbreak build
 ```
 
 ## Project Structure
 
+A Fastbreak project uses the following structure:
+
 ```
-fastbreak/
-├── src/
-│   ├── lib.rs           # Library root
-│   ├── main.rs          # CLI entry point
-│   ├── ast/             # Abstract Syntax Tree definitions
-│   ├── lexer/           # Lexical analysis (logos-based)
-│   ├── parser/          # Recursive descent parser
-│   ├── semantic/        # Semantic analysis and type checking
-│   ├── model/           # Compiled specification model
-│   ├── codegen/         # Output generation (planned)
-│   ├── project/         # Project management (planned)
-│   └── cli/             # Command-line interface (planned)
-└── tests/
+my-spec/
+├── fastbreak.toml    # Project manifest
+├── specs/            # Specification files
+│   └── main.fbrk
+└── docs/             # Generated output
+    ├── my-spec.md
+    ├── my-spec_erd.mmd
+    ├── my-spec_state.mmd
+    └── my-spec_sequence.mmd
 ```
 
-## Implementation Status
+### Project Manifest (fastbreak.toml)
 
-| Phase | Component | Status |
-|-------|-----------|--------|
-| 1 | Lexer & AST | Complete |
-| 2 | Parser | Complete |
-| 3 | Semantic Analysis | Complete |
-| 4 | Model Representation | Complete |
-| 5 | Code Generation | Planned |
-| 6 | Project Management & CLI | Planned |
+```toml
+[project]
+name = "my-spec"
+version = "0.1.0"
 
-### Completed Features
+[source]
+dir = "specs"
+extension = "fbrk"
 
-- **Lexer**: Full tokenization using logos with support for all language constructs
-- **AST**: Complete abstract syntax tree for modules, types, states, actions, scenarios, and properties
-- **Parser**: Recursive descent parser with comprehensive error messages
-- **Semantic Analysis**: Name resolution, type checking, and validation
-- **Model**: Compiled specification with runtime evaluation and property checking
+[output]
+dir = "docs"
+markdown = true
+diagrams = true
 
-### Planned Features
+[output.diagram_types]
+erd = true
+state = true
+sequence = true
+```
 
-- **Code Generation**: Markdown documentation and Mermaid diagrams
-- **CLI**: `fb build`, `fb check`, `fb doc`, `fb diagram`, `fb init` commands
-- **Multi-file Projects**: Import system with `fastbreak.toml` manifest
-- **Watch Mode**: Automatic rebuild on file changes
+## Self-Specification
 
-## Building
+Fastbreak is specified using Fastbreak itself. The self-specification lives in `spec/` and serves as both documentation and validation:
 
 ```bash
-# Build the project
-cargo build
-
-# Run tests
-cargo test
-
-# Run with clippy
-cargo clippy
+cd spec
+../target/release/fastbreak build
 ```
-
-## Usage (Planned)
-
-```bash
-# Initialize a new project
-fb init my-spec
-
-# Check specifications
-fb check
-
-# Generate documentation
-fb doc
-
-# Generate diagrams
-fb diagram
-
-# Build everything (check + doc + diagram)
-fb build
-```
-
-## Design Principles
-
-1. **Formal but Readable**: Specifications should be precise enough for verification yet readable as documentation
-2. **Rust-like Syntax**: Familiar syntax for developers coming from Rust
-3. **Incremental Verification**: Start with lightweight checks, architect for full model checking
-4. **Multi-paradigm**: Combine structural (Alloy), behavioral (TLA+), and scenario-based (Cucumber) specifications
 
 ## Expression Language
 
 Fastbreak includes a rich expression language supporting:
 
-- **Literals**: Integers, strings, booleans, unit
-- **Collections**: Sets, lists, maps with literals and comprehensions
+- **Literals**: Integers, floats, strings, booleans, unit
+- **Collections**: Sets `{a, b}`, lists `[a, b]`, maps `{k: v}`
 - **Operators**: Arithmetic, comparison, logical, set operations (union, intersect, difference)
-- **Quantifiers**: `forall` and `exists` with filters
-- **Pattern Matching**: `match` expressions with exhaustive checking
-- **Lambdas**: Anonymous functions for map/filter operations
-- **Field Access**: Dot notation for struct fields
-- **Method Calls**: Built-in methods on collections and optionals
+- **Quantifiers**: `forall x in xs => pred(x)` and `exists x in xs where pred(x)`
+- **Typed quantifiers**: `forall x: Type => pred(x)` for universal properties
+- **Pattern Matching**: `match expr { Pat => result, ... }`
+- **Lambdas**: `|x| x + 1` for map/filter operations
+- **Field Access**: `user.email`
+- **Method Calls**: `list.len()`, `set.contains(x)`, `option.unwrap()`
+- **Range expressions**: `1..10`
 
 ## Temporal Operators
 
@@ -200,8 +262,32 @@ Properties can use temporal operators for specifying behavior over time:
 
 - `always { expr }` - Expression holds in all states
 - `eventually { expr }` - Expression holds in at least one state
-- `next { expr }` - Expression holds in the next state (planned)
-- `until` - Expression holds until another becomes true (planned)
+
+## Generated Output
+
+### Markdown Documentation
+
+Generates comprehensive documentation including:
+- Type definitions with field tables
+- Enum variants
+- State definitions with invariants
+- Action signatures with contracts
+- Scenarios with given/when/then steps
+- Properties and quality requirements
+
+### Mermaid Diagrams
+
+- **ERD**: Entity-relationship diagrams showing types and their relationships
+- **State**: State machine diagrams from state definitions
+- **Sequence**: Sequence diagrams from scenarios
+
+## Design Principles
+
+1. **Formal but Readable**: Specifications should be precise enough for verification yet readable as documentation
+2. **Rust-like Syntax**: Familiar syntax for developers coming from Rust
+3. **Incremental Verification**: Start with lightweight checks, architect for full model checking
+4. **Multi-paradigm**: Combine structural (Alloy), behavioral (TLA+), and scenario-based (Cucumber) specifications
+5. **Self-documenting**: Generated documentation keeps specs and docs in sync
 
 ## License
 
