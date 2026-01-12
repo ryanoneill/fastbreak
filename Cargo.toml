@@ -10,7 +10,7 @@ keywords = ["specification", "formal-methods", "documentation"]
 categories = ["development-tools", "command-line-utilities"]
 
 [[bin]]
-name = "fstbrk"
+name = "fastbreak"
 path = "src/main.rs"
 
 [lib]
