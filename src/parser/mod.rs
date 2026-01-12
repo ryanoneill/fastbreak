@@ -12,9 +12,15 @@ use crate::ast::{
     Contract, ContractKind, EnumDef, EnumVariant, Expr, ExprKind, Field, FieldInit, FieldPattern,
     GenericArg, GivenClause, Ident, Import, ImportItem, Invariant, LambdaParam, Literal, MatchArm,
     Module, Path, Pattern, PatternKind, Property, QuantBinding, Relation, RelationConstraint,
-    Scenario, Specification, StateBlock, StateField, TemporalOp, ThenClause, TypeDef, TypeRef,
-    TypeRefKind, UnaryOp, WhenClause,
+    Scenario, Specification, StateBlock, StateField, TemporalOp, ThenClause, TypeAlias, TypeDef,
+    TypeRef, TypeRefKind, UnaryOp, WhenClause,
 };
+
+/// Represents either a type definition or a type alias
+enum TypeOrAlias {
+    Type(TypeDef),
+    Alias(TypeAlias),
+}
 use crate::lexer::{Lexer, SpannedToken, Token};
 use crate::Span;
 
@@ -75,7 +81,13 @@ impl<'src> Parser<'src> {
             let attributes = self.parse_attributes()?;
 
             match self.peek() {
-                Some(Token::Type) => spec.types.push(self.parse_type_def_with_attrs(attributes)?),
+                Some(Token::Type) => {
+                    // Could be a struct (type Foo { ... }) or alias (type Foo = ...)
+                    match self.parse_type_or_alias_with_attrs(attributes)? {
+                        TypeOrAlias::Type(t) => spec.types.push(t),
+                        TypeOrAlias::Alias(a) => spec.type_aliases.push(a),
+                    }
+                }
                 Some(Token::Enum) => spec.enums.push(self.parse_enum_def_with_attrs(attributes)?),
                 Some(Token::Relation) => {
                     spec.relations.push(self.parse_relation_with_attrs(attributes)?);
@@ -234,7 +246,11 @@ impl<'src> Parser<'src> {
 
     // ========== Type Definitions ==========
 
-    fn parse_type_def_with_attrs(&mut self, attributes: Vec<Attribute>) -> ParseResult<TypeDef> {
+    /// Parse either a type definition or type alias
+    fn parse_type_or_alias_with_attrs(
+        &mut self,
+        attributes: Vec<Attribute>,
+    ) -> ParseResult<TypeOrAlias> {
         let start = self.expect(&Token::Type)?;
         let name = self.parse_ident()?;
 
@@ -245,17 +261,54 @@ impl<'src> Parser<'src> {
             Vec::new()
         };
 
-        self.expect(&Token::LBrace)?;
-        let fields = self.parse_comma_separated(Self::parse_field, &Token::RBrace)?;
-        let end = self.expect(&Token::RBrace)?;
+        // Check for '=' (type alias) vs '{' (struct definition)
+        if self.check(&Token::Eq) {
+            self.advance()?;
+            let base = self.parse_type_ref()?;
 
-        Ok(TypeDef {
-            attributes,
-            name,
-            type_params,
-            fields,
-            span: start.merge(end),
-        })
+            // Optional refinement clause
+            let (refinement, end) = if self.check(&Token::Where) {
+                self.advance()?;
+                let pred = self.parse_expr()?;
+                let span = pred.span;
+                (Some(pred), span)
+            } else {
+                (None, base.span)
+            };
+
+            Ok(TypeOrAlias::Alias(TypeAlias {
+                attributes,
+                name,
+                type_params,
+                base,
+                refinement,
+                span: start.merge(end),
+            }))
+        } else {
+            // Struct definition
+            self.expect(&Token::LBrace)?;
+            let fields = self.parse_comma_separated(Self::parse_field, &Token::RBrace)?;
+            let end_brace = self.expect(&Token::RBrace)?;
+
+            // Optional refinement clause: `where <predicate>`
+            let (refinement, end) = if self.check(&Token::Where) {
+                self.advance()?;
+                let pred = self.parse_expr()?;
+                let span = pred.span;
+                (Some(pred), span)
+            } else {
+                (None, end_brace)
+            };
+
+            Ok(TypeOrAlias::Type(TypeDef {
+                attributes,
+                name,
+                type_params,
+                fields,
+                refinement,
+                span: start.merge(end),
+            }))
+        }
     }
 
     fn parse_field(&mut self) -> ParseResult<Field> {
@@ -1175,6 +1228,12 @@ impl<'src> Parser<'src> {
             Some(Token::False) => {
                 let (_, span) = self.advance()?;
                 Ok(Expr::new(ExprKind::Literal(Literal::Bool(false)), span))
+            }
+
+            // Self reference (for refinement predicates)
+            Some(Token::SelfKw) => {
+                let (_, span) = self.advance()?;
+                Ok(Expr::new(ExprKind::SelfRef, span))
             }
 
             // Quantifiers
@@ -2331,5 +2390,69 @@ mod tests {
         .unwrap();
         assert_eq!(spec.types[0].attributes[0].name.as_str(), "deprecated");
         assert!(spec.types[0].attributes[0].args.is_empty());
+    }
+
+    #[test]
+    fn test_parse_type_alias_simple() {
+        let spec = parse("type PositiveInt = Int").unwrap();
+        assert_eq!(spec.type_aliases.len(), 1);
+        assert_eq!(spec.type_aliases[0].name.as_str(), "PositiveInt");
+        assert!(spec.type_aliases[0].refinement.is_none());
+    }
+
+    #[test]
+    fn test_parse_type_alias_with_refinement() {
+        let spec = parse("type PositiveInt = Int where self > 0").unwrap();
+        assert_eq!(spec.type_aliases.len(), 1);
+        assert_eq!(spec.type_aliases[0].name.as_str(), "PositiveInt");
+        assert!(spec.type_aliases[0].refinement.is_some());
+    }
+
+    #[test]
+    fn test_parse_type_alias_generic() {
+        let spec = parse("type NonEmptyList<T> = List<T> where self.len() > 0").unwrap();
+        assert_eq!(spec.type_aliases.len(), 1);
+        assert_eq!(spec.type_aliases[0].name.as_str(), "NonEmptyList");
+        assert_eq!(spec.type_aliases[0].type_params.len(), 1);
+        assert!(spec.type_aliases[0].refinement.is_some());
+    }
+
+    #[test]
+    fn test_parse_struct_with_refinement() {
+        let spec = parse(
+            r#"
+            type DateRange {
+                start: Int,
+                end: Int,
+            } where self.start <= self.end
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.types.len(), 1);
+        assert_eq!(spec.types[0].name.as_str(), "DateRange");
+        assert!(spec.types[0].refinement.is_some());
+    }
+
+    #[test]
+    fn test_parse_self_keyword() {
+        let spec = parse("type Age = Int where self >= 0 and self < 150").unwrap();
+        assert_eq!(spec.type_aliases.len(), 1);
+        let refinement = spec.type_aliases[0].refinement.as_ref().unwrap();
+        // The refinement should be a binary 'and' expression
+        assert!(matches!(refinement.kind, ExprKind::Binary { .. }));
+    }
+
+    #[test]
+    fn test_parse_type_alias_with_attributes() {
+        let spec = parse(
+            r#"
+            @id(TYPE001)
+            type Email = String where self.len() > 0
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.type_aliases.len(), 1);
+        assert_eq!(spec.type_aliases[0].attributes.len(), 1);
+        assert_eq!(spec.type_aliases[0].attributes[0].name.as_str(), "id");
     }
 }

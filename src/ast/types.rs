@@ -1,6 +1,6 @@
 //! Type-related AST nodes
 
-use super::{Attribute, Ident, Path};
+use super::{Attribute, Expr, Ident, Path};
 use crate::Span;
 
 /// Module declaration: `module auth`
@@ -32,7 +32,7 @@ pub struct ImportItem {
     pub alias: Option<Ident>,
 }
 
-/// Type definition: `type User { id: UserId, email: Email }`
+/// Type definition: `type User { id: UserId, email: Email } where ...`
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeDef {
     /// Attributes (e.g., `@id(TYPE-001)`)
@@ -43,6 +43,25 @@ pub struct TypeDef {
     pub type_params: Vec<Ident>,
     /// Fields
     pub fields: Vec<Field>,
+    /// Refinement predicate (optional): `where self.age >= 0`
+    pub refinement: Option<Expr>,
+    /// Span of the entire definition
+    pub span: Span,
+}
+
+/// Type alias with optional refinement: `type Email = String where ...`
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeAlias {
+    /// Attributes (e.g., `@id(ALIAS-001)`)
+    pub attributes: Vec<Attribute>,
+    /// Alias name
+    pub name: Ident,
+    /// Type parameters (for generic aliases)
+    pub type_params: Vec<Ident>,
+    /// The underlying type
+    pub base: TypeRef,
+    /// Refinement predicate (optional): `where self > 0`
+    pub refinement: Option<Expr>,
     /// Span of the entire definition
     pub span: Span,
 }

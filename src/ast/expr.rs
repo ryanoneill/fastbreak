@@ -195,6 +195,9 @@ pub enum ExprKind {
 
     /// Result value (in postconditions)
     Result,
+
+    /// Self reference (in refinement predicates): `self`
+    SelfRef,
 }
 
 /// A literal value

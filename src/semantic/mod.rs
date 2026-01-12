@@ -37,6 +37,8 @@ pub struct Analyzer {
     pub diagnostics: Diagnostics,
     /// Registry of @id values to their spans (for duplicate detection)
     id_registry: IndexMap<SmolStr, Span>,
+    /// The type of `self` during refinement predicate analysis
+    refinement_subject: Option<Type>,
 }
 
 impl Default for Analyzer {
@@ -54,6 +56,7 @@ impl Analyzer {
             types: TypeRegistry::new(),
             diagnostics: Diagnostics::new(),
             id_registry: IndexMap::new(),
+            refinement_subject: None,
         }
     }
 
@@ -831,6 +834,18 @@ impl Analyzer {
                 ));
                 Type::Error
             }
+            ExprKind::SelfRef => {
+                // `self` is only valid in refinement context
+                if let Some(ref subject) = self.refinement_subject {
+                    subject.clone()
+                } else {
+                    self.diagnostics.error(SemanticError::InvalidOperation {
+                        message: "`self` can only be used in refinement predicates".to_string(),
+                        span: expr.span,
+                    });
+                    Type::Error
+                }
+            }
         }
     }
 
@@ -1589,6 +1604,31 @@ mod tests {
             action create() -> User
             "#,
         );
+        assert!(analyzer.succeeded());
+    }
+
+    #[test]
+    fn test_analyze_self_outside_refinement() {
+        // `self` used outside of a refinement context should error
+        let analyzer = analyze_source(
+            r#"
+            state Test {
+                x: Int,
+                invariant "bad" { self > 0 }
+            }
+            "#,
+        );
+        assert!(!analyzer.succeeded());
+        assert!(analyzer.diagnostics.errors().iter().any(|e| {
+            matches!(e, SemanticError::InvalidOperation { message, .. } if message.contains("self"))
+        }));
+    }
+
+    #[test]
+    fn test_analyze_type_alias_simple() {
+        // Type alias without refinement - should parse but we don't validate it yet
+        let analyzer = analyze_source("type PositiveInt = Int");
+        // For now, we just test that it doesn't crash
         assert!(analyzer.succeeded());
     }
 }

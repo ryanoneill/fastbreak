@@ -16,7 +16,8 @@ pub use spec::{
     CompiledAction, CompiledAssignment, CompiledAssertion, CompiledAttribute, CompiledAttributeArg,
     CompiledContract, CompiledEnum, CompiledGiven, CompiledInvariant, CompiledProperty,
     CompiledRelation, CompiledScenario, CompiledSpec, CompiledState, CompiledStruct, CompiledThen,
-    CompiledVariant, CompiledWhen, CompiledWhenAction, Import, RelationProperty, TemporalOp,
+    CompiledTypeAlias, CompiledVariant, CompiledWhen, CompiledWhenAction, Import, RelationProperty,
+    TemporalOp,
 };
 pub use state::{Environment, StateSnapshot, Trace, Value};
 
@@ -67,6 +68,7 @@ impl<'a> SpecBuilder<'a> {
 
         // Build types
         self.build_types(&ast.types, &self.analyzer.types);
+        self.build_type_aliases(&ast.type_aliases);
         self.build_enums(&ast.enums, &self.analyzer.types);
 
         // Build states
@@ -110,8 +112,116 @@ impl<'a> SpecBuilder<'a> {
             let name = &type_def.name.name;
             if let Some(info) = registry.get_struct(name) {
                 let attrs = Self::compile_attributes(&type_def.attributes);
-                let compiled = CompiledStruct::from_info(info, attrs, type_def.span);
+                let refinement = type_def.refinement.as_ref().map(|e| Arc::new(e.clone()));
+                let compiled = CompiledStruct::from_info(info, refinement, attrs, type_def.span);
                 self.spec.structs.insert(name.clone(), compiled);
+            }
+        }
+    }
+
+    fn build_type_aliases(&mut self, aliases: &[ast::TypeAlias]) {
+        for alias in aliases {
+            let attrs = Self::compile_attributes(&alias.attributes);
+            let refinement = alias.refinement.as_ref().map(|e| Arc::new(e.clone()));
+
+            // Resolve the base type
+            let base = self.resolve_type_ref(&alias.base);
+
+            let compiled = spec::CompiledTypeAlias {
+                name: alias.name.name.clone(),
+                type_params: alias.type_params.iter().map(|i| i.name.clone()).collect(),
+                base,
+                refinement,
+                attributes: attrs,
+                doc: None,
+                span: alias.span,
+            };
+            self.spec.type_aliases.insert(alias.name.name.clone(), compiled);
+        }
+    }
+
+    fn resolve_type_ref(&self, type_ref: &ast::TypeRef) -> crate::semantic::Type {
+        use crate::semantic::{Type, TypeId};
+
+        match &type_ref.kind {
+            ast::TypeRefKind::Named(path) => {
+                if let Some(ident) = path.name() {
+                    let name = &ident.name;
+                    // Check for primitive types first
+                    match name.as_str() {
+                        "Int" => Type::Int,
+                        "String" => Type::String,
+                        "Bool" => Type::Bool,
+                        _ => {
+                            // Try to look up as struct
+                            if let Some(info) = self.analyzer.types.get_struct(name) {
+                                Type::Struct(info.id.clone())
+                            // Try to look up as enum
+                            } else if let Some(info) = self.analyzer.types.get_enum(name) {
+                                Type::Enum(info.id.clone())
+                            // Type alias or not yet resolved - create placeholder TypeId
+                            } else {
+                                // For type aliases or unresolved types, create a struct TypeId
+                                // The semantic analysis has already validated the type
+                                Type::Struct(TypeId::new(name.clone(), 0))
+                            }
+                        }
+                    }
+                } else {
+                    Type::Unknown
+                }
+            }
+            ast::TypeRefKind::BuiltIn(builtin) => match builtin {
+                ast::BuiltInType::Int => Type::Int,
+                ast::BuiltInType::String => Type::String,
+                ast::BuiltInType::Bool => Type::Bool,
+                ast::BuiltInType::Set => Type::Set(Arc::new(Type::Unknown)),
+                ast::BuiltInType::Map => Type::Map(Arc::new(Type::Unknown), Arc::new(Type::Unknown)),
+                ast::BuiltInType::List => Type::List(Arc::new(Type::Unknown)),
+                ast::BuiltInType::Option => Type::Option(Arc::new(Type::Unknown)),
+                ast::BuiltInType::Result => {
+                    Type::Result(Arc::new(Type::Unknown), Arc::new(Type::Unknown))
+                }
+            },
+            ast::TypeRefKind::Generic { base, args } => {
+                let base_type = self.resolve_type_ref(base);
+                let resolved_args: Vec<Type> =
+                    args.iter().map(|arg| self.resolve_type_ref(&arg.ty)).collect();
+
+                match &base_type {
+                    Type::Set(_) if !resolved_args.is_empty() => {
+                        Type::Set(Arc::new(resolved_args[0].clone()))
+                    }
+                    Type::List(_) if !resolved_args.is_empty() => {
+                        Type::List(Arc::new(resolved_args[0].clone()))
+                    }
+                    Type::Option(_) if !resolved_args.is_empty() => {
+                        Type::Option(Arc::new(resolved_args[0].clone()))
+                    }
+                    Type::Map(_, _) if resolved_args.len() >= 2 => Type::Map(
+                        Arc::new(resolved_args[0].clone()),
+                        Arc::new(resolved_args[1].clone()),
+                    ),
+                    Type::Result(_, _) if resolved_args.len() >= 2 => Type::Result(
+                        Arc::new(resolved_args[0].clone()),
+                        Arc::new(resolved_args[1].clone()),
+                    ),
+                    _ => base_type,
+                }
+            }
+            ast::TypeRefKind::Tuple(types) => {
+                let resolved: Vec<Type> = types.iter().map(|t| self.resolve_type_ref(t)).collect();
+                Type::Tuple(resolved)
+            }
+            ast::TypeRefKind::Unit => Type::Unit,
+            ast::TypeRefKind::Function { params, ret } => {
+                let resolved_params: Vec<Type> =
+                    params.iter().map(|p| self.resolve_type_ref(p)).collect();
+                let resolved_ret = self.resolve_type_ref(ret);
+                Type::Function {
+                    params: resolved_params,
+                    ret: Arc::new(resolved_ret),
+                }
             }
         }
     }
@@ -514,5 +624,56 @@ mod tests {
         let results = checker.check_properties(&trace);
         assert_eq!(results.len(), 1);
         assert!(results[0].passed);
+    }
+
+    #[test]
+    fn test_compile_type_alias() {
+        let source = r#"
+            type PositiveInt = Int where self > 0
+        "#;
+
+        let spec = parse(source).unwrap();
+        let analyzer = semantic::analyze(&spec);
+        let compiled = compile(&spec, &analyzer);
+
+        assert_eq!(compiled.type_aliases.len(), 1);
+        let alias = compiled.type_aliases.get("PositiveInt").unwrap();
+        assert_eq!(alias.name.as_str(), "PositiveInt");
+        assert!(alias.refinement.is_some());
+    }
+
+    #[test]
+    fn test_compile_type_alias_no_refinement() {
+        let source = r#"
+            type UserId = Int
+        "#;
+
+        let spec = parse(source).unwrap();
+        let analyzer = semantic::analyze(&spec);
+        let compiled = compile(&spec, &analyzer);
+
+        assert_eq!(compiled.type_aliases.len(), 1);
+        let alias = compiled.type_aliases.get("UserId").unwrap();
+        assert_eq!(alias.name.as_str(), "UserId");
+        assert!(alias.refinement.is_none());
+    }
+
+    #[test]
+    fn test_compile_struct_with_refinement() {
+        let source = r#"
+            type Point {
+                x: Int,
+                y: Int,
+            } where self.x >= 0 and self.y >= 0
+        "#;
+
+        let spec = parse(source).unwrap();
+        let analyzer = semantic::analyze(&spec);
+        let compiled = compile(&spec, &analyzer);
+
+        assert_eq!(compiled.structs.len(), 1);
+        let point = compiled.structs.get("Point").unwrap();
+        assert_eq!(point.fields.len(), 2);
+        assert!(point.refinement.is_some());
     }
 }

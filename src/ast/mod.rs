@@ -21,7 +21,7 @@ pub use scenario::{Assertion, Binding, GivenClause, Scenario, ThenClause, WhenCl
 pub use state::{Action, ActionParam, Contract, ContractKind, Invariant, StateBlock, StateField};
 pub use types::{
     BuiltInType, EnumDef, EnumVariant, Field, GenericArg, Import, ImportItem, Module, Relation,
-    RelationConstraint, TypeDef, TypeRef, TypeRefKind,
+    RelationConstraint, TypeAlias, TypeDef, TypeRef, TypeRefKind,
 };
 
 use crate::Span;
@@ -119,8 +119,10 @@ pub struct Specification {
     pub module: Option<Module>,
     /// Import statements
     pub imports: Vec<Import>,
-    /// Type definitions
+    /// Type definitions (structs with fields)
     pub types: Vec<TypeDef>,
+    /// Type aliases (e.g., `type PositiveInt = Int where self > 0`)
+    pub type_aliases: Vec<TypeAlias>,
     /// Enum definitions
     pub enums: Vec<EnumDef>,
     /// Relation definitions
@@ -149,6 +151,7 @@ impl Specification {
             module: None,
             imports: Vec::new(),
             types: Vec::new(),
+            type_aliases: Vec::new(),
             enums: Vec::new(),
             relations: Vec::new(),
             states: Vec::new(),
@@ -162,6 +165,7 @@ impl Specification {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.types.is_empty()
+            && self.type_aliases.is_empty()
             && self.enums.is_empty()
             && self.relations.is_empty()
             && self.states.is_empty()

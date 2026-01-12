@@ -4,7 +4,8 @@
 
 use crate::model::{
     CompiledAction, CompiledAttribute, CompiledEnum, CompiledProperty, CompiledRelation,
-    CompiledScenario, CompiledSpec, CompiledState, CompiledStruct, RelationProperty, TemporalOp,
+    CompiledScenario, CompiledSpec, CompiledState, CompiledStruct, CompiledTypeAlias,
+    RelationProperty, TemporalOp,
 };
 use crate::semantic::Type;
 use std::fmt::Write;
@@ -31,6 +32,7 @@ impl<'a> MarkdownGenerator<'a> {
         self.generate_header();
         self.generate_table_of_contents();
         self.generate_types_section();
+        self.generate_type_aliases_section();
         self.generate_enums_section();
         self.generate_states_section();
         self.generate_actions_section();
@@ -69,6 +71,9 @@ impl<'a> MarkdownGenerator<'a> {
 
         if !self.spec.structs.is_empty() {
             writeln!(self.output, "- [Types](#types)").unwrap();
+        }
+        if !self.spec.type_aliases.is_empty() {
+            writeln!(self.output, "- [Type Aliases](#type-aliases)").unwrap();
         }
         if !self.spec.enums.is_empty() {
             writeln!(self.output, "- [Enums](#enums)").unwrap();
@@ -129,6 +134,48 @@ impl<'a> MarkdownGenerator<'a> {
                 writeln!(self.output, "| `{field_name}` | `{type_str}` |").unwrap();
             }
             writeln!(self.output).unwrap();
+        }
+
+        // Refinement predicate
+        if struct_def.refinement.is_some() {
+            writeln!(self.output, "**Refinement:** Has type constraint\n").unwrap();
+        }
+    }
+
+    fn generate_type_aliases_section(&mut self) {
+        if self.spec.type_aliases.is_empty() {
+            return;
+        }
+
+        writeln!(self.output, "## Type Aliases\n").unwrap();
+
+        for (name, alias) in &self.spec.type_aliases {
+            self.generate_type_alias(name, alias);
+        }
+    }
+
+    fn generate_type_alias(&mut self, name: &str, alias: &CompiledTypeAlias) {
+        let base_type = Self::format_type(&alias.base);
+
+        // Header with type parameters
+        if alias.type_params.is_empty() {
+            writeln!(self.output, "### `{name}` = `{base_type}`\n").unwrap();
+        } else {
+            let params = alias.type_params.join(", ");
+            writeln!(self.output, "### `{name}<{params}>` = `{base_type}`\n").unwrap();
+        }
+
+        // Attributes
+        self.format_attributes(&alias.attributes);
+
+        // Documentation
+        if let Some(doc) = &alias.doc {
+            writeln!(self.output, "{doc}\n").unwrap();
+        }
+
+        // Refinement predicate
+        if alias.refinement.is_some() {
+            writeln!(self.output, "**Refinement:** Has type constraint\n").unwrap();
         }
     }
 
@@ -673,5 +720,45 @@ mod tests {
         assert!(output.contains("**Attributes:**"));
         assert!(output.contains("- `@id(REQ001)`"));
         assert!(output.contains("- `@rationale(\"Core user type for authentication\")`"));
+    }
+
+    #[test]
+    fn test_generate_type_alias() {
+        let source = r#"
+            type PositiveInt = Int where self > 0
+        "#;
+
+        let spec = parse(source).unwrap();
+        let analyzer = semantic::analyze(&spec);
+        let compiled = compile(&spec, &analyzer);
+
+        let generator = MarkdownGenerator::new(&compiled);
+        let output = generator.generate();
+
+        assert!(output.contains("## Type Aliases"));
+        assert!(output.contains("### `PositiveInt` = `Int`"));
+        assert!(output.contains("**Refinement:** Has type constraint"));
+    }
+
+    #[test]
+    fn test_generate_struct_with_refinement() {
+        let source = r#"
+            type Point {
+                x: Int,
+                y: Int,
+            } where self.x >= 0
+        "#;
+
+        let spec = parse(source).unwrap();
+        let analyzer = semantic::analyze(&spec);
+        let compiled = compile(&spec, &analyzer);
+
+        let generator = MarkdownGenerator::new(&compiled);
+        let output = generator.generate();
+
+        assert!(output.contains("## Types"));
+        assert!(output.contains("### `Point`"));
+        assert!(output.contains("| `x` | `Int` |"));
+        assert!(output.contains("**Refinement:** Has type constraint"));
     }
 }

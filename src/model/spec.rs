@@ -81,6 +81,8 @@ pub struct CompiledSpec {
     pub imports: Vec<Import>,
     /// User-defined struct types
     pub structs: IndexMap<SmolStr, CompiledStruct>,
+    /// Type aliases (e.g., `type PositiveInt = Int where self > 0`)
+    pub type_aliases: IndexMap<SmolStr, CompiledTypeAlias>,
     /// User-defined enum types
     pub enums: IndexMap<SmolStr, CompiledEnum>,
     /// State definitions
@@ -103,6 +105,7 @@ impl CompiledSpec {
             module: None,
             imports: Vec::new(),
             structs: IndexMap::new(),
+            type_aliases: IndexMap::new(),
             enums: IndexMap::new(),
             states: IndexMap::new(),
             actions: IndexMap::new(),
@@ -116,6 +119,7 @@ impl CompiledSpec {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.structs.is_empty()
+            && self.type_aliases.is_empty()
             && self.enums.is_empty()
             && self.states.is_empty()
             && self.actions.is_empty()
@@ -128,6 +132,7 @@ impl CompiledSpec {
     #[must_use]
     pub fn definition_count(&self) -> usize {
         self.structs.len()
+            + self.type_aliases.len()
             + self.enums.len()
             + self.states.len()
             + self.actions.len()
@@ -161,6 +166,27 @@ pub struct CompiledStruct {
     pub type_params: Vec<SmolStr>,
     /// Fields with their resolved types
     pub fields: IndexMap<SmolStr, Type>,
+    /// Refinement predicate (optional)
+    pub refinement: Option<Arc<crate::ast::Expr>>,
+    /// Attributes
+    pub attributes: Vec<CompiledAttribute>,
+    /// Documentation comment
+    pub doc: Option<String>,
+    /// Source span
+    pub span: Span,
+}
+
+/// A compiled type alias
+#[derive(Debug, Clone)]
+pub struct CompiledTypeAlias {
+    /// Alias name
+    pub name: SmolStr,
+    /// Type parameters
+    pub type_params: Vec<SmolStr>,
+    /// The underlying base type
+    pub base: Type,
+    /// Refinement predicate (optional)
+    pub refinement: Option<Arc<crate::ast::Expr>>,
     /// Attributes
     pub attributes: Vec<CompiledAttribute>,
     /// Documentation comment
@@ -172,11 +198,17 @@ pub struct CompiledStruct {
 impl CompiledStruct {
     /// Create from semantic `StructInfo`
     #[must_use]
-    pub fn from_info(info: &StructInfo, attributes: Vec<CompiledAttribute>, span: Span) -> Self {
+    pub fn from_info(
+        info: &StructInfo,
+        refinement: Option<Arc<crate::ast::Expr>>,
+        attributes: Vec<CompiledAttribute>,
+        span: Span,
+    ) -> Self {
         Self {
             name: info.id.name.clone(),
             type_params: info.type_params.clone(),
             fields: info.fields.clone(),
+            refinement,
             attributes,
             doc: None,
             span,

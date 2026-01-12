@@ -117,6 +117,10 @@ pub enum Token {
     #[token("return")]
     Return,
 
+    /// `self` keyword for refinement predicates
+    #[token("self")]
+    SelfKw,
+
     // ========== Logical operators ==========
     /// `and` logical operator
     #[token("and")]
@@ -399,6 +403,7 @@ impl std::fmt::Display for Token {
             Token::Let => write!(f, "let"),
             Token::Fn => write!(f, "fn"),
             Token::Return => write!(f, "return"),
+            Token::SelfKw => write!(f, "self"),
             Token::And => write!(f, "and"),
             Token::Or => write!(f, "or"),
             Token::Not => write!(f, "not"),
@@ -705,6 +710,22 @@ mod tests {
                 Token::LParen,
                 Token::String("test reason".into()),
                 Token::RParen,
+            ]
+        );
+    }
+
+    #[test]
+    fn test_self_keyword() {
+        assert_eq!(lex("self"), vec![Token::SelfKw]);
+        // Self in refinement context
+        let tokens = lex("where self > 0");
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Where,
+                Token::SelfKw,
+                Token::RAngle,
+                Token::Integer(0),
             ]
         );
     }
