@@ -1523,7 +1523,29 @@ impl Analyzer {
         if matches!(a, Type::Unknown | Type::Error) || matches!(b, Type::Unknown | Type::Error) {
             return true;
         }
-        a == b
+
+        // Check structural compatibility with nested Unknown handling
+        match (a, b) {
+            (Type::List(a_elem), Type::List(b_elem)) => Self::types_compatible(a_elem, b_elem),
+            (Type::Set(a_elem), Type::Set(b_elem)) => Self::types_compatible(a_elem, b_elem),
+            (Type::Option(a_inner), Type::Option(b_inner)) => {
+                Self::types_compatible(a_inner, b_inner)
+            }
+            (Type::Map(a_key, a_val), Type::Map(b_key, b_val)) => {
+                Self::types_compatible(a_key, b_key) && Self::types_compatible(a_val, b_val)
+            }
+            (Type::Result(a_ok, a_err), Type::Result(b_ok, b_err)) => {
+                Self::types_compatible(a_ok, b_ok) && Self::types_compatible(a_err, b_err)
+            }
+            (Type::Tuple(a_elems), Type::Tuple(b_elems)) => {
+                a_elems.len() == b_elems.len()
+                    && a_elems
+                        .iter()
+                        .zip(b_elems.iter())
+                        .all(|(a, b)| Self::types_compatible(a, b))
+            }
+            _ => a == b,
+        }
     }
 }
 
