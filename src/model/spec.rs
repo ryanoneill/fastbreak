@@ -95,6 +95,8 @@ pub struct CompiledSpec {
     pub scenarios: Vec<CompiledScenario>,
     /// Property definitions
     pub properties: Vec<CompiledProperty>,
+    /// Quality requirements (non-functional requirements)
+    pub qualities: Vec<CompiledQuality>,
 }
 
 impl CompiledSpec {
@@ -112,6 +114,7 @@ impl CompiledSpec {
             relations: IndexMap::new(),
             scenarios: Vec::new(),
             properties: Vec::new(),
+            qualities: Vec::new(),
         }
     }
 
@@ -126,6 +129,7 @@ impl CompiledSpec {
             && self.relations.is_empty()
             && self.scenarios.is_empty()
             && self.properties.is_empty()
+            && self.qualities.is_empty()
     }
 
     /// Get the total number of definitions
@@ -548,4 +552,62 @@ pub enum TemporalOp {
     Until,
     /// The property holds in the next state
     Next,
+}
+
+/// A compiled quality requirement (non-functional requirement)
+#[derive(Debug, Clone)]
+pub struct CompiledQuality {
+    /// Quality category (performance, reliability, etc.)
+    pub category: QualityCategory,
+    /// Description/name of the quality requirement
+    pub description: SmolStr,
+    /// Metric being measured
+    pub metric: SmolStr,
+    /// Target value as formatted string
+    pub target: String,
+    /// Additional properties
+    pub properties: Vec<CompiledQualityProperty>,
+    /// Attributes
+    pub attributes: Vec<CompiledAttribute>,
+    /// Source span
+    pub span: Span,
+}
+
+/// Quality category
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QualityCategory {
+    /// Performance requirements (latency, throughput)
+    Performance,
+    /// Reliability requirements (uptime, MTBF)
+    Reliability,
+    /// Security requirements (encryption, authentication)
+    Security,
+    /// Usability requirements (accessibility, learnability)
+    Usability,
+    /// Scalability requirements (capacity, elasticity)
+    Scalability,
+    /// Maintainability requirements (testability, modularity)
+    Maintainability,
+}
+
+impl std::fmt::Display for QualityCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            QualityCategory::Performance => write!(f, "Performance"),
+            QualityCategory::Reliability => write!(f, "Reliability"),
+            QualityCategory::Security => write!(f, "Security"),
+            QualityCategory::Usability => write!(f, "Usability"),
+            QualityCategory::Scalability => write!(f, "Scalability"),
+            QualityCategory::Maintainability => write!(f, "Maintainability"),
+        }
+    }
+}
+
+/// Additional property for a quality requirement
+#[derive(Debug, Clone)]
+pub struct CompiledQualityProperty {
+    /// Property name
+    pub name: SmolStr,
+    /// Property value as formatted string
+    pub value: String,
 }

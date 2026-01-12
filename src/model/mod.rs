@@ -15,9 +15,9 @@ pub use checker::{CheckResult, Checker, Counterexample};
 pub use spec::{
     CompiledAction, CompiledAlternative, CompiledAssignment, CompiledAssertion, CompiledAttribute,
     CompiledAttributeArg, CompiledContract, CompiledEnum, CompiledGiven, CompiledInvariant,
-    CompiledProperty, CompiledRelation, CompiledScenario, CompiledSpec, CompiledState,
-    CompiledStruct, CompiledThen, CompiledTypeAlias, CompiledVariant, CompiledWhen,
-    CompiledWhenAction, Import, RelationProperty, TemporalOp,
+    CompiledProperty, CompiledQuality, CompiledQualityProperty, CompiledRelation, CompiledScenario,
+    CompiledSpec, CompiledState, CompiledStruct, CompiledThen, CompiledTypeAlias, CompiledVariant,
+    CompiledWhen, CompiledWhenAction, Import, QualityCategory, RelationProperty, TemporalOp,
 };
 pub use state::{Environment, StateSnapshot, Trace, Value};
 
@@ -85,6 +85,9 @@ impl<'a> SpecBuilder<'a> {
 
         // Build properties
         self.build_properties(&ast.properties);
+
+        // Build qualities (NFRs)
+        self.build_qualities(&ast.qualities);
 
         self.spec
     }
@@ -412,6 +415,77 @@ impl<'a> SpecBuilder<'a> {
             };
 
             self.spec.properties.push(compiled);
+        }
+    }
+
+    fn build_qualities(&mut self, qualities: &[ast::Quality]) {
+        for quality in qualities {
+            let category = Self::convert_quality_category(quality.category);
+            let target = Self::format_quality_target(&quality.target);
+            let properties = quality
+                .properties
+                .iter()
+                .map(|p| spec::CompiledQualityProperty {
+                    name: p.name.name.clone(),
+                    value: Self::format_quality_property_value(&p.value),
+                })
+                .collect();
+
+            let compiled = spec::CompiledQuality {
+                category,
+                description: quality.description.clone(),
+                metric: quality.metric.name.clone(),
+                target,
+                properties,
+                attributes: Self::compile_attributes(&quality.attributes),
+                span: quality.span,
+            };
+
+            self.spec.qualities.push(compiled);
+        }
+    }
+
+    fn convert_quality_category(cat: ast::QualityCategory) -> spec::QualityCategory {
+        match cat {
+            ast::QualityCategory::Performance => spec::QualityCategory::Performance,
+            ast::QualityCategory::Reliability => spec::QualityCategory::Reliability,
+            ast::QualityCategory::Security => spec::QualityCategory::Security,
+            ast::QualityCategory::Usability => spec::QualityCategory::Usability,
+            ast::QualityCategory::Scalability => spec::QualityCategory::Scalability,
+            ast::QualityCategory::Maintainability => spec::QualityCategory::Maintainability,
+        }
+    }
+
+    fn format_quality_target(target: &ast::QualityTarget) -> String {
+        let op = match target.op {
+            ast::QualityOp::Lt => "<",
+            ast::QualityOp::LtEq => "<=",
+            ast::QualityOp::Gt => ">",
+            ast::QualityOp::GtEq => ">=",
+            ast::QualityOp::Eq => "==",
+        };
+        let value = Self::format_quality_value(&target.value);
+        format!("{op} {value}")
+    }
+
+    fn format_quality_value(value: &ast::QualityValue) -> String {
+        match value {
+            ast::QualityValue::Int(n) => n.to_string(),
+            ast::QualityValue::Percentage(p) => format!("{p}%"),
+            ast::QualityValue::Duration(n, unit) => format!("{n}{unit}"),
+            ast::QualityValue::Size(n, unit) => format!("{n}{unit}"),
+            ast::QualityValue::Rate(n, unit) => format!("{n}{unit}"),
+            ast::QualityValue::Expr(_) => "<expr>".to_string(),
+        }
+    }
+
+    fn format_quality_property_value(value: &ast::QualityPropertyValue) -> String {
+        match value {
+            ast::QualityPropertyValue::Ident(ident) => ident.name.to_string(),
+            ast::QualityPropertyValue::Target(target) => Self::format_quality_target(target),
+            ast::QualityPropertyValue::AppliesTo(applies_to) => {
+                format!("{} {}", applies_to.kind, applies_to.name.name)
+            }
         }
     }
 }

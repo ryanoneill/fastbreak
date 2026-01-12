@@ -7,6 +7,7 @@
 mod attribute;
 mod expr;
 mod property;
+mod quality;
 mod scenario;
 mod state;
 mod types;
@@ -17,6 +18,10 @@ pub use expr::{
     PatternKind, QuantBinding, UnaryOp,
 };
 pub use property::{Property, TemporalOp};
+pub use quality::{
+    AppliesTo, AppliesToKind, DurationUnit, Quality, QualityCategory, QualityOp, QualityProperty,
+    QualityPropertyValue, QualityTarget, QualityValue, RateUnit, SizeUnit,
+};
 pub use scenario::{Alternative, Assertion, Binding, GivenClause, Scenario, ThenClause, WhenClause};
 pub use state::{Action, ActionParam, Contract, ContractKind, Invariant, StateBlock, StateField};
 pub use types::{
@@ -135,6 +140,8 @@ pub struct Specification {
     pub scenarios: Vec<Scenario>,
     /// Property definitions
     pub properties: Vec<Property>,
+    /// Quality requirements (NFRs)
+    pub qualities: Vec<Quality>,
 }
 
 impl Default for Specification {
@@ -158,6 +165,7 @@ impl Specification {
             actions: Vec::new(),
             scenarios: Vec::new(),
             properties: Vec::new(),
+            qualities: Vec::new(),
         }
     }
 
@@ -172,5 +180,6 @@ impl Specification {
             && self.actions.is_empty()
             && self.scenarios.is_empty()
             && self.properties.is_empty()
+            && self.qualities.is_empty()
     }
 }

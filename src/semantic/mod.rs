@@ -18,8 +18,8 @@ pub use types::{
 
 use crate::ast::{
     Action, Alternative, Attribute, AttributeArg, BinaryOp, BuiltInType, EnumDef, Expr, ExprKind,
-    Literal, Pattern, PatternKind, Relation, Scenario, Specification, StateBlock, TypeDef,
-    TypeRef, TypeRefKind, UnaryOp,
+    Literal, Pattern, PatternKind, Quality, QualityValue, Relation, Scenario, Specification,
+    StateBlock, TypeDef, TypeRef, TypeRefKind, UnaryOp,
 };
 use crate::Span;
 use indexmap::IndexMap;
@@ -71,9 +71,10 @@ impl Analyzer {
         // Phase 3: Register and resolve states, actions, relations
         self.resolve_definitions(spec);
 
-        // Phase 4: Check scenarios and properties
+        // Phase 4: Check scenarios, properties, and qualities
         self.check_scenarios(spec);
         self.check_properties(spec);
+        self.check_qualities(spec);
 
         // Phase 5: Validate attributes (IDs, references)
         self.validate_all_attributes(spec);
@@ -556,6 +557,33 @@ impl Analyzer {
         }
     }
 
+    fn check_qualities(&mut self, spec: &Specification) {
+        for quality in &spec.qualities {
+            self.check_quality(quality);
+        }
+    }
+
+    fn check_quality(&mut self, quality: &Quality) {
+        // Check if target value is an expression that needs type checking
+        if let QualityValue::Expr(expr) = &quality.target.value {
+            self.symbols.enter_scope(ScopeKind::Property);
+            // Expression targets should evaluate to a comparable type
+            let _expr_type = self.check_expr(expr);
+            self.symbols.leave_scope();
+        }
+
+        // Check additional properties that might contain expressions
+        for prop in &quality.properties {
+            if let crate::ast::QualityPropertyValue::Target(target) = &prop.value
+                && let QualityValue::Expr(expr) = &target.value
+            {
+                self.symbols.enter_scope(ScopeKind::Property);
+                let _expr_type = self.check_expr(expr);
+                self.symbols.leave_scope();
+            }
+        }
+    }
+
     // ========== Phase 5: Attribute Validation ==========
 
     fn validate_all_attributes(&mut self, spec: &Specification) {
@@ -583,6 +611,9 @@ impl Analyzer {
         }
         for property in &spec.properties {
             self.validate_attributes(&property.attributes);
+        }
+        for quality in &spec.qualities {
+            self.validate_attributes(&quality.attributes);
         }
     }
 
@@ -1728,5 +1759,41 @@ mod tests {
         let analyzer = analyze_source("type PositiveInt = Int");
         // For now, we just test that it doesn't crash
         assert!(analyzer.succeeded());
+    }
+
+    #[test]
+    fn test_analyze_quality() {
+        let analyzer = analyze_source(
+            r#"
+            quality performance "API response time" {
+                metric: latency,
+                target: < 200ms,
+            }
+            "#,
+        );
+        assert!(analyzer.succeeded());
+    }
+
+    #[test]
+    fn test_analyze_quality_with_duplicate_id() {
+        let analyzer = analyze_source(
+            r#"
+            @id("NFR-001")
+            quality performance "API response time" {
+                metric: latency,
+                target: < 200ms,
+            }
+
+            @id("NFR-001")
+            quality reliability "Uptime" {
+                metric: uptime,
+                target: >= 99%,
+            }
+            "#,
+        );
+        assert!(!analyzer.succeeded());
+        assert!(analyzer.diagnostics.errors().iter().any(|e| {
+            matches!(e, SemanticError::DuplicateId { id, .. } if id == "NFR-001")
+        }));
     }
 }

@@ -69,6 +69,42 @@ pub enum Token {
     #[token("alt")]
     Alt,
 
+    /// `quality` keyword for non-functional requirements
+    #[token("quality")]
+    Quality,
+
+    /// `performance` quality category
+    #[token("performance")]
+    Performance,
+
+    /// `reliability` quality category
+    #[token("reliability")]
+    Reliability,
+
+    /// `security` quality category
+    #[token("security")]
+    Security,
+
+    /// `usability` quality category
+    #[token("usability")]
+    Usability,
+
+    /// `scalability` quality category
+    #[token("scalability")]
+    Scalability,
+
+    /// `maintainability` quality category
+    #[token("maintainability")]
+    Maintainability,
+
+    /// `metric` keyword for quality metrics
+    #[token("metric")]
+    Metric,
+
+    /// `target` keyword for quality targets
+    #[token("target")]
+    Target,
+
     /// `property` keyword
     #[token("property")]
     Property,
@@ -395,6 +431,15 @@ impl std::fmt::Display for Token {
             Token::When => write!(f, "when"),
             Token::Then => write!(f, "then"),
             Token::Alt => write!(f, "alt"),
+            Token::Quality => write!(f, "quality"),
+            Token::Performance => write!(f, "performance"),
+            Token::Reliability => write!(f, "reliability"),
+            Token::Security => write!(f, "security"),
+            Token::Usability => write!(f, "usability"),
+            Token::Scalability => write!(f, "scalability"),
+            Token::Maintainability => write!(f, "maintainability"),
+            Token::Metric => write!(f, "metric"),
+            Token::Target => write!(f, "target"),
             Token::Property => write!(f, "property"),
             Token::Always => write!(f, "always"),
             Token::Eventually => write!(f, "eventually"),
@@ -634,6 +679,23 @@ mod tests {
             tokens,
             vec![Token::Scenario, Token::Given, Token::When, Token::Then, Token::Alt]
         );
+    }
+
+    #[test]
+    fn test_quality_keywords() {
+        let tokens = lex("quality performance reliability security scalability");
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Quality,
+                Token::Performance,
+                Token::Reliability,
+                Token::Security,
+                Token::Scalability,
+            ]
+        );
+        let tokens = lex("metric target");
+        assert_eq!(tokens, vec![Token::Metric, Token::Target]);
     }
 
     #[test]

@@ -9,11 +9,13 @@ pub use error::{ParseError, ParseResult};
 
 use crate::ast::{
     Action, ActionParam, Alternative, Assertion, Attribute, AttributeArg, BinaryOp, Binding,
-    BuiltInType, Contract, ContractKind, EnumDef, EnumVariant, Expr, ExprKind, Field, FieldInit,
-    FieldPattern, GenericArg, GivenClause, Ident, Import, ImportItem, Invariant, LambdaParam,
-    Literal, MatchArm, Module, Path, Pattern, PatternKind, Property, QuantBinding, Relation,
-    RelationConstraint, Scenario, Specification, StateBlock, StateField, TemporalOp, ThenClause,
-    TypeAlias, TypeDef, TypeRef, TypeRefKind, UnaryOp, WhenClause,
+    BuiltInType, Contract, ContractKind, DurationUnit, EnumDef, EnumVariant, Expr, ExprKind, Field,
+    FieldInit, FieldPattern, GenericArg, GivenClause, Ident, Import, ImportItem, Invariant,
+    LambdaParam, Literal, MatchArm, Module, Path, Pattern, PatternKind, Property, Quality,
+    QualityCategory, QualityOp, QualityProperty, QualityPropertyValue, QualityTarget, QualityValue,
+    QuantBinding, RateUnit, Relation, RelationConstraint, Scenario, Specification, StateBlock,
+    StateField, TemporalOp, ThenClause, TypeAlias, TypeDef, TypeRef, TypeRefKind, UnaryOp,
+    WhenClause,
 };
 
 /// Represents either a type definition or a type alias
@@ -102,10 +104,13 @@ impl<'src> Parser<'src> {
                 Some(Token::Property) => {
                     spec.properties.push(self.parse_property_with_attrs(attributes)?);
                 }
+                Some(Token::Quality) => {
+                    spec.qualities.push(self.parse_quality_with_attrs(attributes)?);
+                }
                 Some(_) => {
                     let (token, span) = self.advance()?;
                     return Err(ParseError::unexpected(
-                        "type, enum, state, action, scenario, or property",
+                        "type, enum, state, action, scenario, property, or quality",
                         &token,
                         span,
                     ));
@@ -999,6 +1004,276 @@ impl<'src> Parser<'src> {
             description,
             temporal_op,
             expr,
+            span: start.merge(end),
+        })
+    }
+
+    // ========== Quality Requirements ==========
+
+    fn parse_quality_with_attrs(&mut self, attributes: Vec<Attribute>) -> ParseResult<Quality> {
+        let start = self.expect(&Token::Quality)?;
+
+        // Parse category
+        let category = self.parse_quality_category()?;
+
+        // Parse description string
+        let description = match self.peek() {
+            Some(Token::String(s)) => {
+                let s = s.clone();
+                self.advance()?;
+                s
+            }
+            Some(token) => {
+                let token = token.clone();
+                let span = self.current_span();
+                return Err(ParseError::unexpected(
+                    "quality description string",
+                    &token,
+                    span,
+                ));
+            }
+            None => {
+                return Err(ParseError::unexpected_eof(
+                    "quality description",
+                    self.eof_span(),
+                ))
+            }
+        };
+
+        self.expect(&Token::LBrace)?;
+
+        // Parse metric (required)
+        self.expect(&Token::Metric)?;
+        self.expect(&Token::Colon)?;
+        let metric = self.parse_ident()?;
+        // Optional comma
+        if self.check(&Token::Comma) {
+            self.advance()?;
+        }
+
+        // Parse target (required)
+        self.expect(&Token::Target)?;
+        self.expect(&Token::Colon)?;
+        let target = self.parse_quality_target()?;
+        // Optional comma
+        if self.check(&Token::Comma) {
+            self.advance()?;
+        }
+
+        // Parse optional additional properties
+        let mut properties = Vec::new();
+        while !self.check(&Token::RBrace) {
+            properties.push(self.parse_quality_property()?);
+            // Optional comma
+            if self.check(&Token::Comma) {
+                self.advance()?;
+            }
+        }
+
+        let end = self.expect(&Token::RBrace)?;
+
+        Ok(Quality {
+            attributes,
+            category,
+            description,
+            metric,
+            target,
+            properties,
+            span: start.merge(end),
+        })
+    }
+
+    fn parse_quality_category(&mut self) -> ParseResult<QualityCategory> {
+        match self.peek() {
+            Some(Token::Performance) => {
+                self.advance()?;
+                Ok(QualityCategory::Performance)
+            }
+            Some(Token::Reliability) => {
+                self.advance()?;
+                Ok(QualityCategory::Reliability)
+            }
+            Some(Token::Security) => {
+                self.advance()?;
+                Ok(QualityCategory::Security)
+            }
+            Some(Token::Usability) => {
+                self.advance()?;
+                Ok(QualityCategory::Usability)
+            }
+            Some(Token::Scalability) => {
+                self.advance()?;
+                Ok(QualityCategory::Scalability)
+            }
+            Some(Token::Maintainability) => {
+                self.advance()?;
+                Ok(QualityCategory::Maintainability)
+            }
+            Some(token) => {
+                let token = token.clone();
+                let span = self.current_span();
+                Err(ParseError::unexpected("quality category", &token, span))
+            }
+            None => Err(ParseError::unexpected_eof(
+                "quality category",
+                self.eof_span(),
+            )),
+        }
+    }
+
+    fn parse_quality_target(&mut self) -> ParseResult<QualityTarget> {
+        let start = self.current_span();
+
+        // Parse comparison operator
+        let op = match self.peek() {
+            Some(Token::LAngle) => {
+                self.advance()?;
+                QualityOp::Lt
+            }
+            Some(Token::LtEq) => {
+                self.advance()?;
+                QualityOp::LtEq
+            }
+            Some(Token::RAngle) => {
+                self.advance()?;
+                QualityOp::Gt
+            }
+            Some(Token::GtEq) => {
+                self.advance()?;
+                QualityOp::GtEq
+            }
+            Some(Token::EqEq) => {
+                self.advance()?;
+                QualityOp::Eq
+            }
+            Some(token) => {
+                let token = token.clone();
+                let span = self.current_span();
+                return Err(ParseError::unexpected(
+                    "comparison operator (<, <=, >, >=, ==)",
+                    &token,
+                    span,
+                ));
+            }
+            None => {
+                return Err(ParseError::unexpected_eof(
+                    "comparison operator",
+                    self.eof_span(),
+                ))
+            }
+        };
+
+        // Parse value
+        let value = self.parse_quality_value()?;
+
+        let end = self.current_span();
+
+        Ok(QualityTarget {
+            op,
+            value,
+            span: start.merge(end),
+        })
+    }
+
+    fn parse_quality_value(&mut self) -> ParseResult<QualityValue> {
+        match self.peek() {
+            Some(Token::Integer(n)) => {
+                let n = *n;
+                self.advance()?;
+
+                // Check for unit suffix
+                match self.peek() {
+                    Some(Token::Ident(unit)) if unit.as_str() == "ms" => {
+                        self.advance()?;
+                        Ok(QualityValue::Duration(n, DurationUnit::Ms))
+                    }
+                    Some(Token::Ident(unit)) if unit.as_str() == "s" => {
+                        self.advance()?;
+                        Ok(QualityValue::Duration(n, DurationUnit::S))
+                    }
+                    Some(Token::Ident(unit)) if unit.as_str() == "m" => {
+                        self.advance()?;
+                        Ok(QualityValue::Duration(n, DurationUnit::M))
+                    }
+                    Some(Token::Ident(unit)) if unit.as_str() == "h" => {
+                        self.advance()?;
+                        Ok(QualityValue::Duration(n, DurationUnit::H))
+                    }
+                    Some(Token::Percent) => {
+                        self.advance()?;
+                        #[allow(clippy::cast_precision_loss)]
+                        Ok(QualityValue::Percentage(n as f64))
+                    }
+                    Some(Token::Slash) => {
+                        self.advance()?;
+                        // Expect rate unit: s, m, or h
+                        let unit = match self.peek() {
+                            Some(Token::Ident(u)) if u.as_str() == "s" => {
+                                self.advance()?;
+                                RateUnit::PerSecond
+                            }
+                            Some(Token::Ident(u)) if u.as_str() == "m" => {
+                                self.advance()?;
+                                RateUnit::PerMinute
+                            }
+                            Some(Token::Ident(u)) if u.as_str() == "h" => {
+                                self.advance()?;
+                                RateUnit::PerHour
+                            }
+                            Some(token) => {
+                                let token = token.clone();
+                                return Err(ParseError::expected_ident(
+                                    &token,
+                                    self.current_span(),
+                                ));
+                            }
+                            None => {
+                                return Err(ParseError::unexpected_eof(
+                                    "rate unit",
+                                    self.eof_span(),
+                                ));
+                            }
+                        };
+                        Ok(QualityValue::Rate(n, unit))
+                    }
+                    _ => Ok(QualityValue::Int(n)),
+                }
+            }
+            Some(_) => {
+                // Fall back to expression parsing
+                let expr = self.parse_expr()?;
+                Ok(QualityValue::Expr(expr))
+            }
+            None => Err(ParseError::unexpected_eof("quality value", self.eof_span())),
+        }
+    }
+
+    fn parse_quality_property(&mut self) -> ParseResult<QualityProperty> {
+        let name = self.parse_ident()?;
+        let start = name.span;
+        self.expect(&Token::Colon)?;
+
+        // Parse value based on property name
+        let value = if self.check(&Token::LAngle)
+            || self.check(&Token::LtEq)
+            || self.check(&Token::RAngle)
+            || self.check(&Token::GtEq)
+            || self.check(&Token::EqEq)
+        {
+            // It's a target value
+            let target = self.parse_quality_target()?;
+            QualityPropertyValue::Target(target)
+        } else {
+            // It's an identifier value
+            let ident = self.parse_ident()?;
+            QualityPropertyValue::Ident(ident)
+        };
+
+        let end = self.current_span();
+
+        Ok(QualityProperty {
+            name,
+            value,
             span: start.merge(end),
         })
     }
@@ -2655,5 +2930,150 @@ mod tests {
         assert_eq!(spec.type_aliases.len(), 1);
         assert_eq!(spec.type_aliases[0].attributes.len(), 1);
         assert_eq!(spec.type_aliases[0].attributes[0].name.as_str(), "id");
+    }
+
+    #[test]
+    fn test_parse_quality_performance() {
+        let spec = parse(
+            r#"
+            quality performance "API response time" {
+                metric: latency,
+                target: < 200ms,
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.qualities.len(), 1);
+        assert_eq!(
+            spec.qualities[0].category,
+            crate::ast::QualityCategory::Performance
+        );
+        assert_eq!(
+            spec.qualities[0].description.as_str(),
+            "API response time"
+        );
+        assert_eq!(spec.qualities[0].metric.as_str(), "latency");
+        assert_eq!(spec.qualities[0].target.op, crate::ast::QualityOp::Lt);
+    }
+
+    #[test]
+    fn test_parse_quality_reliability() {
+        let spec = parse(
+            r#"
+            quality reliability "System uptime" {
+                metric: uptime,
+                target: >= 99%,
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.qualities.len(), 1);
+        assert_eq!(
+            spec.qualities[0].category,
+            crate::ast::QualityCategory::Reliability
+        );
+        assert_eq!(spec.qualities[0].target.op, crate::ast::QualityOp::GtEq);
+        match &spec.qualities[0].target.value {
+            crate::ast::QualityValue::Percentage(p) => {
+                assert!((*p - 99.0).abs() < 0.01);
+            }
+            _ => panic!("Expected percentage value"),
+        }
+    }
+
+    #[test]
+    fn test_parse_quality_with_attributes() {
+        let spec = parse(
+            r#"
+            @id("NFR-001")
+            @priority(high)
+            quality security "Data encryption" {
+                metric: encryption_level,
+                target: == aes256,
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.qualities.len(), 1);
+        assert_eq!(spec.qualities[0].attributes.len(), 2);
+        assert_eq!(spec.qualities[0].attributes[0].name.as_str(), "id");
+        assert_eq!(spec.qualities[0].attributes[1].name.as_str(), "priority");
+    }
+
+    #[test]
+    fn test_parse_quality_with_properties() {
+        let spec = parse(
+            r#"
+            quality performance "Request throughput" {
+                metric: throughput,
+                target: >= 1000/s,
+                scale: p99,
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.qualities.len(), 1);
+        assert_eq!(spec.qualities[0].properties.len(), 1);
+        assert_eq!(spec.qualities[0].properties[0].name.as_str(), "scale");
+    }
+
+    #[test]
+    fn test_parse_quality_all_categories() {
+        let spec = parse(
+            r#"
+            quality performance "perf" { metric: m, target: > 1, }
+            quality reliability "rel" { metric: m, target: > 1, }
+            quality security "sec" { metric: m, target: > 1, }
+            quality usability "usa" { metric: m, target: > 1, }
+            quality scalability "sca" { metric: m, target: > 1, }
+            quality maintainability "mai" { metric: m, target: > 1, }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.qualities.len(), 6);
+        assert_eq!(
+            spec.qualities[0].category,
+            crate::ast::QualityCategory::Performance
+        );
+        assert_eq!(
+            spec.qualities[1].category,
+            crate::ast::QualityCategory::Reliability
+        );
+        assert_eq!(
+            spec.qualities[2].category,
+            crate::ast::QualityCategory::Security
+        );
+        assert_eq!(
+            spec.qualities[3].category,
+            crate::ast::QualityCategory::Usability
+        );
+        assert_eq!(
+            spec.qualities[4].category,
+            crate::ast::QualityCategory::Scalability
+        );
+        assert_eq!(
+            spec.qualities[5].category,
+            crate::ast::QualityCategory::Maintainability
+        );
+    }
+
+    #[test]
+    fn test_parse_quality_duration_units() {
+        let spec = parse(
+            r#"
+            quality performance "fast" { metric: latency, target: < 100ms, }
+            quality performance "slow" { metric: timeout, target: < 30s, }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.qualities.len(), 2);
+        match &spec.qualities[0].target.value {
+            crate::ast::QualityValue::Duration(100, crate::ast::DurationUnit::Ms) => {}
+            _ => panic!("Expected 100ms duration"),
+        }
+        match &spec.qualities[1].target.value {
+            crate::ast::QualityValue::Duration(30, crate::ast::DurationUnit::S) => {}
+            _ => panic!("Expected 30s duration"),
+        }
     }
 }

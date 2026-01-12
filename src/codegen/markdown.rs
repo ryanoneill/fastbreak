@@ -4,8 +4,8 @@
 
 use crate::model::{
     CompiledAction, CompiledAlternative, CompiledAttribute, CompiledEnum, CompiledProperty,
-    CompiledRelation, CompiledScenario, CompiledSpec, CompiledState, CompiledStruct,
-    CompiledTypeAlias, RelationProperty, TemporalOp,
+    CompiledQuality, CompiledRelation, CompiledScenario, CompiledSpec, CompiledState,
+    CompiledStruct, CompiledTypeAlias, RelationProperty, TemporalOp,
 };
 use crate::semantic::Type;
 use std::fmt::Write;
@@ -39,6 +39,7 @@ impl<'a> MarkdownGenerator<'a> {
         self.generate_relations_section();
         self.generate_scenarios_section();
         self.generate_properties_section();
+        self.generate_qualities_section();
         self.output
     }
 
@@ -569,6 +570,46 @@ impl<'a> MarkdownGenerator<'a> {
             Type::Error => "<error>".to_string(),
         }
     }
+
+    fn generate_qualities_section(&mut self) {
+        if self.spec.qualities.is_empty() {
+            return;
+        }
+
+        writeln!(self.output, "## Quality Requirements (NFRs)\n").unwrap();
+
+        for (i, quality) in self.spec.qualities.iter().enumerate() {
+            self.generate_quality(i + 1, quality);
+        }
+    }
+
+    fn generate_quality(&mut self, index: usize, quality: &CompiledQuality) {
+        writeln!(
+            self.output,
+            "### NFR {}: {} - {}\n",
+            index, quality.category, quality.description
+        )
+        .unwrap();
+
+        // Attributes
+        self.format_attributes(&quality.attributes);
+
+        // Category
+        writeln!(self.output, "**Category:** {}\n", quality.category).unwrap();
+
+        // Metric and Target
+        writeln!(self.output, "**Metric:** `{}`\n", quality.metric).unwrap();
+        writeln!(self.output, "**Target:** `{}`\n", quality.target).unwrap();
+
+        // Additional properties
+        if !quality.properties.is_empty() {
+            writeln!(self.output, "**Additional Properties:**\n").unwrap();
+            for prop in &quality.properties {
+                writeln!(self.output, "- `{}`: {}", prop.name, prop.value).unwrap();
+            }
+            writeln!(self.output).unwrap();
+        }
+    }
 }
 
 #[cfg(test)]
@@ -847,5 +888,32 @@ mod tests {
         assert!(output.contains("**Condition:** Has trigger condition"));
         assert!(output.contains("##### with extra setup"));
         assert!(output.contains("**Additional Setup:**"));
+    }
+
+    #[test]
+    fn test_generate_quality() {
+        let source = r#"
+            @id("NFR-001")
+            quality performance "API response time" {
+                metric: latency,
+                target: < 200ms,
+                scale: p99,
+            }
+        "#;
+
+        let spec = parse(source).unwrap();
+        let analyzer = semantic::analyze(&spec);
+        let compiled = compile(&spec, &analyzer);
+
+        let generator = MarkdownGenerator::new(&compiled);
+        let output = generator.generate();
+
+        assert!(output.contains("## Quality Requirements (NFRs)"));
+        assert!(output.contains("### NFR 1: Performance - API response time"));
+        assert!(output.contains("**Category:** Performance"));
+        assert!(output.contains("**Metric:** `latency`"));
+        assert!(output.contains("**Target:** `< 200ms`"));
+        assert!(output.contains("**Additional Properties:**"));
+        assert!(output.contains("- `scale`: p99"));
     }
 }
