@@ -17,7 +17,7 @@ pub use expr::{
     PatternKind, QuantBinding, UnaryOp,
 };
 pub use property::{Property, TemporalOp};
-pub use scenario::{Assertion, Binding, GivenClause, Scenario, ThenClause, WhenClause};
+pub use scenario::{Alternative, Assertion, Binding, GivenClause, Scenario, ThenClause, WhenClause};
 pub use state::{Action, ActionParam, Contract, ContractKind, Invariant, StateBlock, StateField};
 pub use types::{
     BuiltInType, EnumDef, EnumVariant, Field, GenericArg, Import, ImportItem, Module, Relation,

@@ -8,12 +8,12 @@ mod error;
 pub use error::{ParseError, ParseResult};
 
 use crate::ast::{
-    Action, ActionParam, Assertion, Attribute, AttributeArg, BinaryOp, Binding, BuiltInType,
-    Contract, ContractKind, EnumDef, EnumVariant, Expr, ExprKind, Field, FieldInit, FieldPattern,
-    GenericArg, GivenClause, Ident, Import, ImportItem, Invariant, LambdaParam, Literal, MatchArm,
-    Module, Path, Pattern, PatternKind, Property, QuantBinding, Relation, RelationConstraint,
-    Scenario, Specification, StateBlock, StateField, TemporalOp, ThenClause, TypeAlias, TypeDef,
-    TypeRef, TypeRefKind, UnaryOp, WhenClause,
+    Action, ActionParam, Alternative, Assertion, Attribute, AttributeArg, BinaryOp, Binding,
+    BuiltInType, Contract, ContractKind, EnumDef, EnumVariant, Expr, ExprKind, Field, FieldInit,
+    FieldPattern, GenericArg, GivenClause, Ident, Import, ImportItem, Invariant, LambdaParam,
+    Literal, MatchArm, Module, Path, Pattern, PatternKind, Property, QuantBinding, Relation,
+    RelationConstraint, Scenario, Specification, StateBlock, StateField, TemporalOp, ThenClause,
+    TypeAlias, TypeDef, TypeRef, TypeRefKind, UnaryOp, WhenClause,
 };
 
 /// Represents either a type definition or a type alias
@@ -773,6 +773,29 @@ impl<'src> Parser<'src> {
         let when = self.parse_when_clause()?;
         let then = self.parse_then_clause()?;
 
+        // Parse alternative flows
+        let mut alternatives = Vec::new();
+        while self.check(&Token::Alt) || self.check(&Token::At) {
+            // Handle attributes before alt
+            let alt_attrs = if self.check(&Token::At) {
+                self.parse_attributes()?
+            } else {
+                Vec::new()
+            };
+
+            if self.check(&Token::Alt) {
+                alternatives.push(self.parse_alternative_with_attrs(alt_attrs)?);
+            } else if !alt_attrs.is_empty() {
+                // We have attributes but not an alt - that's an error
+                let span = self.current_span();
+                return Err(ParseError::unexpected(
+                    "alt",
+                    &self.peek().cloned().unwrap_or(Token::RBrace),
+                    span,
+                ));
+            }
+        }
+
         let end = self.expect(&Token::RBrace)?;
 
         Ok(Scenario {
@@ -781,6 +804,7 @@ impl<'src> Parser<'src> {
             given,
             when,
             then,
+            alternatives,
             span: start.merge(end),
         })
     }
@@ -851,6 +875,79 @@ impl<'src> Parser<'src> {
             expr,
             description: None,
             span,
+        })
+    }
+
+    fn parse_alternative_with_attrs(
+        &mut self,
+        attributes: Vec<Attribute>,
+    ) -> ParseResult<Alternative> {
+        let start = self.expect(&Token::Alt)?;
+
+        // Parse the alternative name (required string)
+        let name = match self.peek() {
+            Some(Token::String(s)) => {
+                let s = s.clone();
+                self.advance()?;
+                s
+            }
+            Some(token) => {
+                let token = token.clone();
+                let span = self.current_span();
+                return Err(ParseError::unexpected(
+                    "alternative description string",
+                    &token,
+                    span,
+                ));
+            }
+            None => {
+                return Err(ParseError::unexpected_eof(
+                    "alternative description",
+                    self.eof_span(),
+                ))
+            }
+        };
+
+        // Optional condition: `when { expr }`
+        let condition = if self.check(&Token::When) {
+            self.advance()?; // consume 'when'
+            self.expect(&Token::LBrace)?;
+            let expr = self.parse_expr()?;
+            self.expect(&Token::RBrace)?;
+            Some(expr)
+        } else {
+            None
+        };
+
+        self.expect(&Token::LBrace)?;
+
+        // Optional given clause (extends base)
+        let given = if self.check(&Token::Given) {
+            Some(self.parse_given_clause()?)
+        } else {
+            None
+        };
+
+        // Optional when clause (replaces base)
+        let when = if self.check(&Token::When) {
+            Some(self.parse_when_clause()?)
+        } else {
+            None
+        };
+
+        // Required then clause
+        let then = self.parse_then_clause()?;
+
+        let end = self.expect(&Token::RBrace)?;
+
+        Ok(Alternative {
+            attributes,
+            name,
+            condition,
+            given,
+            when,
+            then,
+            span: start.merge(end),
         })
     }
 
@@ -2193,6 +2290,110 @@ mod tests {
             spec.scenarios[0].description.as_str(),
             "User registers successfully"
         );
+    }
+
+    #[test]
+    fn test_parse_scenario_with_alternative() {
+        let spec = parse(
+            r#"
+            scenario "User registration" {
+                given {
+                    users = {}
+                }
+                when {
+                    result = register("test@example.com")
+                }
+                then {
+                    result is Ok
+                }
+
+                alt "email already exists" when { exists u in users where u.email == email } {
+                    then {
+                        result is Err
+                    }
+                }
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.scenarios.len(), 1);
+        assert_eq!(spec.scenarios[0].alternatives.len(), 1);
+        assert_eq!(
+            spec.scenarios[0].alternatives[0].name.as_str(),
+            "email already exists"
+        );
+        assert!(spec.scenarios[0].alternatives[0].condition.is_some());
+    }
+
+    #[test]
+    fn test_parse_alternative_with_different_when() {
+        let spec = parse(
+            r#"
+            scenario "test" {
+                given { x = 1 }
+                when { result = perform(x) }
+                then { result is Ok }
+
+                alt "different action" {
+                    when { result = other_perform(x) }
+                    then { result is Ok }
+                }
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.scenarios[0].alternatives.len(), 1);
+        assert!(spec.scenarios[0].alternatives[0].when.is_some());
+        assert!(spec.scenarios[0].alternatives[0].condition.is_none());
+    }
+
+    #[test]
+    fn test_parse_alternative_with_additional_given() {
+        let spec = parse(
+            r#"
+            scenario "test" {
+                given { x = 1 }
+                when { result = perform(x) }
+                then { result is Ok }
+
+                alt "with extra setup" {
+                    given { y = 2 }
+                    then { result.value == y }
+                }
+            }
+            "#,
+        )
+        .unwrap();
+        assert!(spec.scenarios[0].alternatives[0].given.is_some());
+        assert!(spec.scenarios[0].alternatives[0].when.is_none());
+    }
+
+    #[test]
+    fn test_parse_multiple_alternatives() {
+        let spec = parse(
+            r#"
+            scenario "withdraw funds" {
+                given { balance = 100 }
+                when { result = withdraw(50) }
+                then { balance' == 50 }
+
+                alt "insufficient funds" when { amount > balance } {
+                    then { result is Err }
+                }
+
+                alt "negative amount" when { amount < 0 } {
+                    then { result is Err }
+                }
+
+                alt "account frozen" {
+                    given { status = Frozen }
+                    then { result is Err }
+                }
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.scenarios[0].alternatives.len(), 3);
     }
 
     #[test]

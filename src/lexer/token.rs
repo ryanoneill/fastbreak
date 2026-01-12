@@ -65,6 +65,10 @@ pub enum Token {
     #[token("then")]
     Then,
 
+    /// `alt` keyword for alternative flows
+    #[token("alt")]
+    Alt,
+
     /// `property` keyword
     #[token("property")]
     Property,
@@ -390,6 +394,7 @@ impl std::fmt::Display for Token {
             Token::Given => write!(f, "given"),
             Token::When => write!(f, "when"),
             Token::Then => write!(f, "then"),
+            Token::Alt => write!(f, "alt"),
             Token::Property => write!(f, "property"),
             Token::Always => write!(f, "always"),
             Token::Eventually => write!(f, "eventually"),
@@ -624,10 +629,10 @@ mod tests {
 
     #[test]
     fn test_scenario_keywords() {
-        let tokens = lex("scenario given when then");
+        let tokens = lex("scenario given when then alt");
         assert_eq!(
             tokens,
-            vec![Token::Scenario, Token::Given, Token::When, Token::Then]
+            vec![Token::Scenario, Token::Given, Token::When, Token::Then, Token::Alt]
         );
     }
 

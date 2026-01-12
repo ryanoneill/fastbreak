@@ -433,10 +433,31 @@ pub struct CompiledScenario {
     pub when: Vec<CompiledWhen>,
     /// Then clauses (expected outcomes)
     pub then: Vec<CompiledThen>,
+    /// Alternative flows (error cases, extensions)
+    pub alternatives: Vec<CompiledAlternative>,
     /// Attributes
     pub attributes: Vec<CompiledAttribute>,
     /// Documentation comment
     pub doc: Option<String>,
+    /// Source span
+    pub span: Span,
+}
+
+/// A compiled alternative flow
+#[derive(Debug, Clone)]
+pub struct CompiledAlternative {
+    /// Alternative name/description
+    pub name: String,
+    /// Condition that triggers this alternative (optional)
+    pub condition: Option<Arc<crate::ast::Expr>>,
+    /// Additional given bindings (optional, extends base)
+    pub given: Option<CompiledGiven>,
+    /// Different when clause (optional, replaces base)
+    pub when: Option<CompiledWhen>,
+    /// Expected outcome (required)
+    pub then: CompiledThen,
+    /// Attributes
+    pub attributes: Vec<CompiledAttribute>,
     /// Source span
     pub span: Span,
 }

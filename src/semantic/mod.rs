@@ -17,9 +17,9 @@ pub use types::{
 };
 
 use crate::ast::{
-    Action, Attribute, AttributeArg, BinaryOp, BuiltInType, EnumDef, Expr, ExprKind, Literal,
-    Pattern, PatternKind, Relation, Scenario, Specification, StateBlock, TypeDef, TypeRef,
-    TypeRefKind, UnaryOp,
+    Action, Alternative, Attribute, AttributeArg, BinaryOp, BuiltInType, EnumDef, Expr, ExprKind,
+    Literal, Pattern, PatternKind, Relation, Scenario, Specification, StateBlock, TypeDef,
+    TypeRef, TypeRefKind, UnaryOp,
 };
 use crate::Span;
 use indexmap::IndexMap;
@@ -487,6 +487,62 @@ impl Analyzer {
             self.expect_type(&assertion_type, &Type::Bool, assertion.expr.span);
         }
         self.symbols.leave_scope();
+
+        // Check alternative flows
+        for alternative in &scenario.alternatives {
+            self.check_alternative(alternative, scenario);
+        }
+
+        self.symbols.leave_scope();
+    }
+
+    fn check_alternative(&mut self, alt: &Alternative, scenario: &Scenario) {
+        self.symbols.enter_scope(ScopeKind::Given);
+
+        // Re-add base given bindings
+        for binding in &scenario.given.bindings {
+            let value_type = self.check_expr(&binding.value);
+            self.symbols.define(Symbol::new(
+                binding.name.name.clone(),
+                SymbolKind::Variable(value_type),
+                binding.name.span,
+            ));
+        }
+
+        // Check condition (if present, must be Bool)
+        if let Some(ref cond) = alt.condition {
+            let cond_type = self.check_expr(cond);
+            self.expect_type(&cond_type, &Type::Bool, cond.span);
+        }
+
+        // Add additional given bindings (if present)
+        if let Some(ref given) = alt.given {
+            for binding in &given.bindings {
+                let value_type = self.check_expr(&binding.value);
+                self.symbols.define(Symbol::new(
+                    binding.name.name.clone(),
+                    SymbolKind::Variable(value_type),
+                    binding.name.span,
+                ));
+            }
+        }
+
+        // Use alternative's when or base when
+        let when = alt.when.as_ref().unwrap_or(&scenario.when);
+        for binding in &when.bindings {
+            let value_type = self.check_expr(&binding.value);
+            self.symbols.define(Symbol::new(
+                binding.name.name.clone(),
+                SymbolKind::Variable(value_type),
+                binding.name.span,
+            ));
+        }
+
+        // Check then assertions
+        for assertion in &alt.then.assertions {
+            let assertion_type = self.check_expr(&assertion.expr);
+            self.expect_type(&assertion_type, &Type::Bool, assertion.expr.span);
+        }
 
         self.symbols.leave_scope();
     }
@@ -1534,6 +1590,48 @@ mod tests {
                 given { x = 1 }
                 when { y = x + 1 }
                 then { y == 2 }
+            }
+            "#,
+        );
+        assert!(analyzer.succeeded());
+    }
+
+    #[test]
+    fn test_analyze_scenario_with_alternative() {
+        let analyzer = analyze_source(
+            r#"
+            scenario "test with alternatives" {
+                given { x = 1 }
+                when { y = x + 1 }
+                then { y > 0 }
+
+                alt "negative input" when { x < 0 } {
+                    then { x == 0 }
+                }
+
+                alt "with extra given" {
+                    given { z = 5 }
+                    then { z > x }
+                }
+            }
+            "#,
+        );
+        assert!(analyzer.succeeded());
+    }
+
+    #[test]
+    fn test_analyze_alternative_inherits_base_given() {
+        // x from base given should be accessible in alternative
+        let analyzer = analyze_source(
+            r#"
+            scenario "test" {
+                given { x = 1 }
+                when { y = x + 1 }
+                then { y > 0 }
+
+                alt "uses x" when { x > 0 } {
+                    then { x == 1 }
+                }
             }
             "#,
         );

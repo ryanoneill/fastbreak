@@ -33,7 +33,40 @@ pub struct Scenario {
     pub when: WhenClause,
     /// Then clause (expected outcomes)
     pub then: ThenClause,
+    /// Alternative flows (error cases, extensions)
+    pub alternatives: Vec<Alternative>,
     /// Span of the entire scenario
+    pub span: Span,
+}
+
+/// An alternative flow within a scenario
+///
+/// Alternative flows describe error cases, exceptions, or optional behavior
+/// that diverge from the main (happy) path.
+///
+/// ```fbs
+/// alt "email already exists" when { exists u in users where u.email == email } {
+///     then {
+///         result is Err(DuplicateEmail)
+///         users' == users
+///     }
+/// }
+/// ```
+#[derive(Debug, Clone, PartialEq)]
+pub struct Alternative {
+    /// Attributes (e.g., `@id(ALT-001)`)
+    pub attributes: Vec<Attribute>,
+    /// Alternative name/description
+    pub name: SmolStr,
+    /// Condition that triggers this alternative (optional)
+    pub condition: Option<Expr>,
+    /// Additional given bindings (optional, extends base)
+    pub given: Option<GivenClause>,
+    /// Different when clause (optional, replaces base)
+    pub when: Option<WhenClause>,
+    /// Expected outcome (required)
+    pub then: ThenClause,
+    /// Span of the alternative
     pub span: Span,
 }
 

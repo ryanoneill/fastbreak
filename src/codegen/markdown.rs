@@ -3,9 +3,9 @@
 //! Generates comprehensive Markdown documentation from a compiled specification.
 
 use crate::model::{
-    CompiledAction, CompiledAttribute, CompiledEnum, CompiledProperty, CompiledRelation,
-    CompiledScenario, CompiledSpec, CompiledState, CompiledStruct, CompiledTypeAlias,
-    RelationProperty, TemporalOp,
+    CompiledAction, CompiledAlternative, CompiledAttribute, CompiledEnum, CompiledProperty,
+    CompiledRelation, CompiledScenario, CompiledSpec, CompiledState, CompiledStruct,
+    CompiledTypeAlias, RelationProperty, TemporalOp,
 };
 use crate::semantic::Type;
 use std::fmt::Write;
@@ -436,6 +436,58 @@ impl<'a> MarkdownGenerator<'a> {
             }
             writeln!(self.output).unwrap();
         }
+
+        // Alternative flows
+        if !scenario.alternatives.is_empty() {
+            writeln!(self.output, "#### Alternative Flows\n").unwrap();
+            for alt in &scenario.alternatives {
+                self.generate_alternative(alt);
+            }
+        }
+    }
+
+    fn generate_alternative(&mut self, alt: &CompiledAlternative) {
+        writeln!(self.output, "##### {}\n", alt.name).unwrap();
+
+        // Attributes
+        self.format_attributes(&alt.attributes);
+
+        // Condition
+        if alt.condition.is_some() {
+            writeln!(self.output, "**Condition:** Has trigger condition\n").unwrap();
+        }
+
+        // Additional given
+        if let Some(ref given) = alt.given {
+            writeln!(self.output, "**Additional Setup:**").unwrap();
+            for assignment in &given.assignments {
+                writeln!(self.output, "- `{}` is initialized", assignment.name).unwrap();
+            }
+            writeln!(self.output).unwrap();
+        }
+
+        // Different when
+        if let Some(ref when) = alt.when {
+            writeln!(self.output, "**Different Action:**").unwrap();
+            for action in &when.actions {
+                if let Some(binding) = &action.binding {
+                    writeln!(self.output, "- `{binding}` = action result").unwrap();
+                } else {
+                    writeln!(self.output, "- Action executed").unwrap();
+                }
+            }
+            writeln!(self.output).unwrap();
+        }
+
+        // Expected outcome
+        writeln!(self.output, "**Expected:**").unwrap();
+        writeln!(
+            self.output,
+            "- {} assertion(s) verified",
+            alt.then.assertions.len()
+        )
+        .unwrap();
+        writeln!(self.output).unwrap();
     }
 
     fn generate_properties_section(&mut self) {
@@ -760,5 +812,40 @@ mod tests {
         assert!(output.contains("### `Point`"));
         assert!(output.contains("| `x` | `Int` |"));
         assert!(output.contains("**Refinement:** Has type constraint"));
+    }
+
+    #[test]
+    fn test_generate_scenario_with_alternatives() {
+        let source = r#"
+            scenario "user registration" {
+                given { users = 0 }
+                when { result = users + 1 }
+                then { result > 0 }
+
+                alt "email already exists" when { users > 0 } {
+                    then { result == 0 }
+                }
+
+                alt "with extra setup" {
+                    given { extra = 5 }
+                    then { extra > 0 }
+                }
+            }
+        "#;
+
+        let spec = parse(source).unwrap();
+        let analyzer = semantic::analyze(&spec);
+        let compiled = compile(&spec, &analyzer);
+
+        let generator = MarkdownGenerator::new(&compiled);
+        let output = generator.generate();
+
+        assert!(output.contains("## Scenarios"));
+        assert!(output.contains("### Scenario 1: user registration"));
+        assert!(output.contains("#### Alternative Flows"));
+        assert!(output.contains("##### email already exists"));
+        assert!(output.contains("**Condition:** Has trigger condition"));
+        assert!(output.contains("##### with extra setup"));
+        assert!(output.contains("**Additional Setup:**"));
     }
 }

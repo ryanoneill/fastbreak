@@ -13,11 +13,11 @@ mod state;
 
 pub use checker::{CheckResult, Checker, Counterexample};
 pub use spec::{
-    CompiledAction, CompiledAssignment, CompiledAssertion, CompiledAttribute, CompiledAttributeArg,
-    CompiledContract, CompiledEnum, CompiledGiven, CompiledInvariant, CompiledProperty,
-    CompiledRelation, CompiledScenario, CompiledSpec, CompiledState, CompiledStruct, CompiledThen,
-    CompiledTypeAlias, CompiledVariant, CompiledWhen, CompiledWhenAction, Import, RelationProperty,
-    TemporalOp,
+    CompiledAction, CompiledAlternative, CompiledAssignment, CompiledAssertion, CompiledAttribute,
+    CompiledAttributeArg, CompiledContract, CompiledEnum, CompiledGiven, CompiledInvariant,
+    CompiledProperty, CompiledRelation, CompiledScenario, CompiledSpec, CompiledState,
+    CompiledStruct, CompiledThen, CompiledTypeAlias, CompiledVariant, CompiledWhen,
+    CompiledWhenAction, Import, RelationProperty, TemporalOp,
 };
 pub use state::{Environment, StateSnapshot, Trace, Value};
 
@@ -311,17 +311,36 @@ impl<'a> SpecBuilder<'a> {
 
     fn build_scenarios(&mut self, scenarios: &[ast::Scenario]) {
         for scenario in scenarios {
+            let alternatives = scenario
+                .alternatives
+                .iter()
+                .map(Self::build_alternative)
+                .collect();
+
             let compiled = CompiledScenario {
                 name: scenario.description.to_string(),
                 given: vec![Self::build_given(&scenario.given)],
                 when: vec![Self::build_when(&scenario.when)],
                 then: vec![Self::build_then(&scenario.then)],
+                alternatives,
                 attributes: Self::compile_attributes(&scenario.attributes),
                 doc: None,
                 span: scenario.span,
             };
 
             self.spec.scenarios.push(compiled);
+        }
+    }
+
+    fn build_alternative(alt: &ast::Alternative) -> CompiledAlternative {
+        CompiledAlternative {
+            name: alt.name.to_string(),
+            condition: alt.condition.as_ref().map(|e| Arc::new(e.clone())),
+            given: alt.given.as_ref().map(Self::build_given),
+            when: alt.when.as_ref().map(Self::build_when),
+            then: Self::build_then(&alt.then),
+            attributes: Self::compile_attributes(&alt.attributes),
+            span: alt.span,
         }
     }
 
