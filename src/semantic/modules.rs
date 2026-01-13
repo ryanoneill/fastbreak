@@ -185,13 +185,14 @@ impl ModuleRegistry {
 
     /// Resolve an import statement to a `ResolvedImport`
     fn resolve_import(import: &Import) -> ResolvedImport {
+        // Use `.` as separator to match Module::name() format
         let source_module = import
             .path
             .segments
             .iter()
             .map(|s| s.name.as_str())
             .collect::<Vec<_>>()
-            .join("::");
+            .join(".");
 
         let items = import
             .items
@@ -460,9 +461,9 @@ mod tests {
             r#"
             module main
 
-            use common::types::Email
-            use common::types::UserId
-            use auth::User
+            use common.types.Email
+            use common.types.UserId
+            use auth.User
 
             type Profile {
                 id: Int,
@@ -476,10 +477,10 @@ mod tests {
         let info = registry.get_module("main").unwrap();
         assert_eq!(info.imports.len(), 3);
 
-        // Check imports - they're full paths now
-        assert_eq!(info.imports[0].source_module.as_str(), "common::types::Email");
-        assert_eq!(info.imports[1].source_module.as_str(), "common::types::UserId");
-        assert_eq!(info.imports[2].source_module.as_str(), "auth::User");
+        // Check imports - paths use . separator to match Module::name() format
+        assert_eq!(info.imports[0].source_module.as_str(), "common.types.Email");
+        assert_eq!(info.imports[1].source_module.as_str(), "common.types.UserId");
+        assert_eq!(info.imports[2].source_module.as_str(), "auth.User");
     }
 
     #[test]
@@ -647,5 +648,48 @@ mod tests {
         // No import errors
         let errors = registry.validate_imports();
         assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_import_with_dotted_path() {
+        // Test imports with dotted module paths like `use abc.catalog::{Item}`
+        let types_spec = parse(
+            r#"
+            module abc.catalog
+
+            type Item { id: Int }
+            type Category { name: String }
+            "#,
+        )
+        .unwrap();
+
+        let users_spec = parse(
+            r#"
+            module users
+
+            use abc.catalog::{Item, Category}
+
+            type Cart {
+                items: Set<Item>,
+            }
+            "#,
+        )
+        .unwrap();
+
+        let registry = ModuleRegistry::from_specs(&[&types_spec, &users_spec]);
+
+        // Check the catalog module with dotted name
+        assert!(registry.get_module("abc.catalog").is_some());
+        let catalog_info = registry.get_module("abc.catalog").unwrap();
+        assert!(catalog_info.types.contains("Item"));
+        assert!(catalog_info.types.contains("Category"));
+
+        // Check imported types are available in users module
+        assert!(registry.is_type_available_in(Some("users"), "Item"));
+        assert!(registry.is_type_available_in(Some("users"), "Category"));
+
+        // No import errors
+        let errors = registry.validate_imports();
+        assert!(errors.is_empty(), "Unexpected errors: {errors:?}");
     }
 }

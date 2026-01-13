@@ -28,7 +28,7 @@ impl Module {
     }
 }
 
-/// Import statement: `use common::types::{Email, UserId}`
+/// Import statement: `use common.types::{Email, UserId}`
 #[derive(Debug, Clone, PartialEq)]
 pub struct Import {
     /// Base path

@@ -238,7 +238,8 @@ impl<'src> Parser<'src> {
 
     fn parse_import(&mut self) -> ParseResult<Import> {
         let start = self.expect(&Token::Use)?;
-        let path = self.parse_path()?;
+        // Module paths use dot separators (like `abc.catalog`)
+        let path = self.parse_dotted_path()?;
 
         let items = if self.check(&Token::ColonColon) && self.check_ahead(1, &Token::LBrace) {
             self.advance()?; // ::
