@@ -44,6 +44,36 @@ fastbreak build
 
 Fastbreak uses a Rust-like syntax with the `.fbrk` file extension.
 
+### Modules and Imports
+
+Specifications can be organized across multiple files using modules and imports:
+
+```fbrk
+// In types.fbrk
+module myproject.types
+
+type UserId { value: Int }
+type Email { address: String }
+```
+
+```fbrk
+// In users.fbrk
+module myproject.users
+
+use myproject.types::{UserId, Email}
+
+type User {
+    id: UserId,
+    email: Email,
+}
+```
+
+Import aliases allow renaming imported items:
+
+```fbrk
+use types::{Identifier as Id, Email as E}
+```
+
 ### Type Definitions
 
 ```fbrk
