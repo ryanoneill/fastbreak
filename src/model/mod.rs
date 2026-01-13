@@ -21,7 +21,7 @@ pub use spec::{
 };
 pub use state::{Environment, StateSnapshot, Trace, Value};
 
-use crate::ast::{self, Specification};
+use crate::ast::{self, Module, Specification};
 use crate::semantic::{Analyzer, TypeRegistry};
 use smol_str::SmolStr;
 use std::sync::Arc;
@@ -61,7 +61,7 @@ impl<'a> SpecBuilder<'a> {
     /// Build the compiled specification
     fn build(mut self, ast: &Specification) -> CompiledSpec {
         // Set module name
-        self.spec.module = ast.module.as_ref().map(|m| m.name.name.clone());
+        self.spec.module = ast.module.as_ref().map(Module::name);
 
         // Build imports
         self.build_imports(&ast.imports);

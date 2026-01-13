@@ -2,14 +2,30 @@
 
 use super::{Attribute, Expr, Ident, Path};
 use crate::Span;
+use smol_str::SmolStr;
 
-/// Module declaration: `module auth`
+/// Module declaration: `module auth` or `module abc.def.ghi`
 #[derive(Debug, Clone, PartialEq)]
 pub struct Module {
-    /// Module name
-    pub name: Ident,
+    /// Module path segments (supports dotted names like "abc.def.ghi")
+    pub path: Path,
     /// Span of the entire declaration
     pub span: Span,
+}
+
+impl Module {
+    /// Get the full module name as a dotted string
+    #[must_use]
+    pub fn name(&self) -> SmolStr {
+        SmolStr::new(
+            self.path
+                .segments
+                .iter()
+                .map(Ident::as_str)
+                .collect::<Vec<_>>()
+                .join("."),
+        )
+    }
 }
 
 /// Import statement: `use common::types::{Email, UserId}`

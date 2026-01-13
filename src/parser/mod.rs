@@ -212,9 +212,27 @@ impl<'src> Parser<'src> {
 
     fn parse_module(&mut self) -> ParseResult<Module> {
         let start = self.expect_keyword_ident("module")?;
-        let name = self.parse_ident()?;
-        let span = start.merge(name.span);
-        Ok(Module { name, span })
+        let path = self.parse_dotted_path()?;
+        let span = start.merge(path.span);
+        Ok(Module { path, span })
+    }
+
+    /// Parse a dot-separated path like `abc.def.ghi`
+    fn parse_dotted_path(&mut self) -> ParseResult<Path> {
+        let first = self.parse_ident()?;
+        let mut segments = vec![first];
+
+        while self.check(&Token::Dot) {
+            self.advance()?;
+            segments.push(self.parse_ident()?);
+        }
+
+        let span = segments
+            .first()
+            .unwrap()
+            .span
+            .merge(segments.last().unwrap().span);
+        Ok(Path::new(segments, span))
     }
 
     fn parse_import(&mut self) -> ParseResult<Import> {
@@ -2602,7 +2620,18 @@ mod tests {
     #[test]
     fn test_parse_module() {
         let spec = parse("module auth").unwrap();
-        assert_eq!(spec.module.as_ref().unwrap().name.as_str(), "auth");
+        assert_eq!(spec.module.as_ref().unwrap().name(), "auth");
+    }
+
+    #[test]
+    fn test_parse_dotted_module() {
+        let spec = parse("module abc.def.ghi").unwrap();
+        let module = spec.module.as_ref().unwrap();
+        assert_eq!(module.name(), "abc.def.ghi");
+        assert_eq!(module.path.segments.len(), 3);
+        assert_eq!(module.path.segments[0].as_str(), "abc");
+        assert_eq!(module.path.segments[1].as_str(), "def");
+        assert_eq!(module.path.segments[2].as_str(), "ghi");
     }
 
     #[test]

@@ -3,7 +3,7 @@
 //! Handles loading multi-file Fastbreak projects with import resolution.
 
 use super::manifest::{Manifest, ManifestError};
-use crate::ast::Specification;
+use crate::ast::{Module, Specification};
 use crate::model::{compile, CompiledSpec};
 use crate::parser::{self, ParseError};
 use crate::semantic::{self, Analyzer, ModuleRegistry};
@@ -136,7 +136,7 @@ impl Loader {
             error: e,
         })?;
 
-        let module = ast.module.as_ref().map(|m| m.name.name.clone());
+        let module = ast.module.as_ref().map(Module::name);
 
         // Build module registry from the AST
         let modules = ModuleRegistry::from_spec(&ast);
@@ -202,7 +202,7 @@ impl Loader {
                 error: e,
             })?;
 
-            let module = ast.module.as_ref().map(|m| m.name.name.clone());
+            let module = ast.module.as_ref().map(Module::name);
 
             sources.insert(
                 path.clone(),

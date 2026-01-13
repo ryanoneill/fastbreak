@@ -227,8 +227,15 @@ type BlockExpression {
 // Specification (top-level)
 // ============================================================================
 
+// Module path for dotted names like "abc.def.ghi"
+type ModulePath {
+    segments: List<Identifier>,
+    span: Span,
+}
+
 type Module {
-    name: Identifier,
+    // Module name supports dotted paths (e.g., "abc.def")
+    name: ModulePath,
     span: Span,
 }
 
@@ -382,6 +389,20 @@ scenario "Parse a state with invariant" {
     then {
         result is Ok
         result.unwrap().states.len() == 1
+    }
+}
+
+scenario "Parse dotted module name" {
+    given {
+        source = "module abc.def.ghi\n\ntype User { id: Int }"
+    }
+    when {
+        result = parse(source)
+    }
+    then {
+        result is Ok
+        result.unwrap().module is Some
+        result.unwrap().module.unwrap().name.segments.len() == 3
     }
 }
 

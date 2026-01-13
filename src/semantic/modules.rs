@@ -2,7 +2,7 @@
 //!
 //! Tracks which definitions belong to which module and resolves imports.
 
-use crate::ast::{Import, Specification};
+use crate::ast::{Import, Module, Specification};
 use indexmap::{IndexMap, IndexSet};
 use smol_str::SmolStr;
 
@@ -68,7 +68,7 @@ impl ModuleRegistry {
         let module_name = spec
             .module
             .as_ref()
-            .map_or_else(|| SmolStr::new("default"), |m| m.name.name.clone());
+            .map_or_else(|| SmolStr::new("default"), Module::name);
 
         registry.current_module = Some(module_name.clone());
 
