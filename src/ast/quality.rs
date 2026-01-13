@@ -9,7 +9,19 @@ use smol_str::SmolStr;
 /// ```fbrk
 /// quality performance "API response time" {
 ///     metric: latency,
-///     target: < 200ms,
+///     scale: p99,
+///     target: < 100ms,
+///     constraint: hard,
+///     applies_to: action register,
+///     measurement: per_request,
+///     under_load: {
+///         concurrent_users: 1000,
+///         requests_per_second: 500,
+///     },
+///     verified_by: [
+///         test "load_test_api",
+///         monitor "datadog_latency",
+///     ],
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq)]
@@ -22,12 +34,166 @@ pub struct Quality {
     pub description: SmolStr,
     /// Metric being measured
     pub metric: Ident,
+    /// Statistical scale (e.g., p99, mean)
+    pub scale: Option<Scale>,
     /// Target value expression
     pub target: QualityTarget,
-    /// Additional properties
+    /// Hard constraint vs soft target
+    pub constraint: Option<Constraint>,
+    /// What this quality applies to
+    pub applies_to: Option<AppliesTo>,
+    /// Measurement period
+    pub measurement: Option<MeasurementPeriod>,
+    /// Load conditions for the measurement
+    pub under_load: Option<LoadConditions>,
+    /// Verification methods
+    pub verified_by: Vec<VerificationMethod>,
+    /// Additional properties (for extensibility)
     pub properties: Vec<QualityProperty>,
     /// Span of the entire quality block
     pub span: Span,
+}
+
+/// Statistical scale for measurements
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Scale {
+    /// Arithmetic mean
+    Mean,
+    /// Median (50th percentile)
+    Median,
+    /// 50th percentile
+    P50,
+    /// 90th percentile
+    P90,
+    /// 95th percentile
+    P95,
+    /// 99th percentile
+    P99,
+    /// 99.9th percentile
+    P999,
+    /// Maximum value
+    Max,
+    /// Minimum value
+    Min,
+}
+
+impl std::fmt::Display for Scale {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Scale::Mean => write!(f, "mean"),
+            Scale::Median => write!(f, "median"),
+            Scale::P50 => write!(f, "p50"),
+            Scale::P90 => write!(f, "p90"),
+            Scale::P95 => write!(f, "p95"),
+            Scale::P99 => write!(f, "p99"),
+            Scale::P999 => write!(f, "p999"),
+            Scale::Max => write!(f, "max"),
+            Scale::Min => write!(f, "min"),
+        }
+    }
+}
+
+/// Whether a quality target is a hard constraint or soft target
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Constraint {
+    /// Must be met - failure is unacceptable
+    Hard,
+    /// Goal/target - best effort
+    Soft,
+}
+
+impl std::fmt::Display for Constraint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Constraint::Hard => write!(f, "hard"),
+            Constraint::Soft => write!(f, "soft"),
+        }
+    }
+}
+
+/// Measurement period for quality metrics
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MeasurementPeriod {
+    /// Measured per individual request
+    PerRequest,
+    /// Measured per second
+    PerSecond,
+    /// Measured per minute
+    PerMinute,
+    /// Measured hourly
+    Hourly,
+    /// Measured daily
+    Daily,
+    /// Measured weekly
+    Weekly,
+    /// Measured monthly
+    Monthly,
+}
+
+impl std::fmt::Display for MeasurementPeriod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MeasurementPeriod::PerRequest => write!(f, "per_request"),
+            MeasurementPeriod::PerSecond => write!(f, "per_second"),
+            MeasurementPeriod::PerMinute => write!(f, "per_minute"),
+            MeasurementPeriod::Hourly => write!(f, "hourly"),
+            MeasurementPeriod::Daily => write!(f, "daily"),
+            MeasurementPeriod::Weekly => write!(f, "weekly"),
+            MeasurementPeriod::Monthly => write!(f, "monthly"),
+        }
+    }
+}
+
+/// Load conditions under which the quality is measured
+#[derive(Debug, Clone, PartialEq)]
+pub struct LoadConditions {
+    /// Number of concurrent users
+    pub concurrent_users: Option<i64>,
+    /// Number of concurrent connections
+    pub concurrent_connections: Option<i64>,
+    /// Requests per second
+    pub requests_per_second: Option<i64>,
+    /// Payload size
+    pub payload_size: Option<(i64, SizeUnit)>,
+    /// Duration of sustained load
+    pub duration: Option<(i64, DurationUnit)>,
+    /// Span
+    pub span: Span,
+}
+
+/// Verification method for a quality requirement
+#[derive(Debug, Clone, PartialEq)]
+pub struct VerificationMethod {
+    /// Kind of verification
+    pub kind: VerificationKind,
+    /// Name/identifier of the verification
+    pub name: SmolStr,
+    /// Span
+    pub span: Span,
+}
+
+/// Kind of verification method
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerificationKind {
+    /// Automated test
+    Test,
+    /// Monitoring/observability
+    Monitor,
+    /// Performance benchmark
+    Benchmark,
+    /// Manual audit process
+    Audit,
+}
+
+impl std::fmt::Display for VerificationKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VerificationKind::Test => write!(f, "test"),
+            VerificationKind::Monitor => write!(f, "monitor"),
+            VerificationKind::Benchmark => write!(f, "benchmark"),
+            VerificationKind::Audit => write!(f, "audit"),
+        }
+    }
 }
 
 /// Category of quality requirement

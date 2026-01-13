@@ -565,7 +565,19 @@ pub struct CompiledQuality {
     pub metric: SmolStr,
     /// Target value as formatted string
     pub target: String,
-    /// Additional properties
+    /// Statistical scale (e.g., p99, mean) as formatted string
+    pub scale: Option<String>,
+    /// Hard constraint vs soft target
+    pub constraint: Option<String>,
+    /// What this quality applies to (e.g., "action register")
+    pub applies_to: Option<String>,
+    /// Measurement period (e.g., "per_request", "hourly")
+    pub measurement: Option<String>,
+    /// Load conditions as formatted string
+    pub under_load: Option<String>,
+    /// Verification methods as formatted strings
+    pub verified_by: Vec<String>,
+    /// Additional properties (for extensibility)
     pub properties: Vec<CompiledQualityProperty>,
     /// Attributes
     pub attributes: Vec<CompiledAttribute>,

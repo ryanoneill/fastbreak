@@ -8,14 +8,15 @@ mod error;
 pub use error::{ParseError, ParseResult};
 
 use crate::ast::{
-    Action, ActionParam, Alternative, Assertion, Attribute, AttributeArg, BinaryOp, Binding,
-    BuiltInType, Contract, ContractKind, DurationUnit, EnumDef, EnumVariant, Expr, ExprKind, Field,
-    FieldInit, FieldPattern, GenericArg, GivenClause, Ident, Import, ImportItem, Invariant,
-    LambdaParam, Literal, MatchArm, Module, Path, Pattern, PatternKind, Property, Quality,
-    QualityCategory, QualityOp, QualityProperty, QualityPropertyValue, QualityTarget, QualityValue,
-    QuantBinding, QuantBindingKind, RateUnit, Relation, RelationConstraint, Scenario, Specification,
-    StateBlock, StateField, TemporalOp, ThenClause, TypeAlias, TypeDef, TypeRef, TypeRefKind,
-    UnaryOp, WhenClause,
+    Action, ActionParam, Alternative, AppliesTo, AppliesToKind, Assertion, Attribute, AttributeArg,
+    BinaryOp, Binding, BuiltInType, Constraint, Contract, ContractKind, DurationUnit, EnumDef,
+    EnumVariant, Expr, ExprKind, Field, FieldInit, FieldPattern, GenericArg, GivenClause, Ident,
+    Import, ImportItem, Invariant, LambdaParam, Literal, LoadConditions, MatchArm, MeasurementPeriod,
+    Module, Path, Pattern, PatternKind, Property, Quality, QualityCategory, QualityOp,
+    QualityProperty, QualityPropertyValue, QualityTarget, QualityValue, QuantBinding,
+    QuantBindingKind, RateUnit, Relation, RelationConstraint, Scale, Scenario, SizeUnit,
+    Specification, StateBlock, StateField, TemporalOp, ThenClause, TypeAlias, TypeDef, TypeRef,
+    TypeRefKind, UnaryOp, VerificationKind, VerificationMethod, WhenClause,
 };
 
 /// Represents either a type definition or a type alias
@@ -1074,28 +1075,68 @@ impl<'src> Parser<'src> {
 
         self.expect(&Token::LBrace)?;
 
-        // Parse metric (required)
-        self.expect_keyword_ident("metric")?;
-        self.expect(&Token::Colon)?;
-        let metric = self.parse_ident()?;
-        // Optional comma
-        if self.check(&Token::Comma) {
-            self.advance()?;
-        }
+        // All properties are optional and can appear in any order
+        let mut metric: Option<Ident> = None;
+        let mut scale: Option<Scale> = None;
+        let mut target: Option<QualityTarget> = None;
+        let mut constraint: Option<Constraint> = None;
+        let mut applies_to: Option<AppliesTo> = None;
+        let mut measurement: Option<MeasurementPeriod> = None;
+        let mut under_load: Option<LoadConditions> = None;
+        let mut verified_by: Vec<VerificationMethod> = Vec::new();
+        let mut properties: Vec<QualityProperty> = Vec::new();
 
-        // Parse target (required)
-        self.expect_keyword_ident("target")?;
-        self.expect(&Token::Colon)?;
-        let target = self.parse_quality_target()?;
-        // Optional comma
-        if self.check(&Token::Comma) {
-            self.advance()?;
-        }
-
-        // Parse optional additional properties
-        let mut properties = Vec::new();
         while !self.check(&Token::RBrace) {
-            properties.push(self.parse_quality_property()?);
+            let prop_name = self.parse_ident()?;
+            self.expect(&Token::Colon)?;
+
+            match prop_name.as_str() {
+                "metric" => {
+                    metric = Some(self.parse_ident()?);
+                }
+                "scale" => {
+                    scale = Some(self.parse_scale()?);
+                }
+                "target" => {
+                    target = Some(self.parse_quality_target()?);
+                }
+                "constraint" => {
+                    constraint = Some(self.parse_constraint()?);
+                }
+                "applies_to" => {
+                    applies_to = Some(self.parse_applies_to()?);
+                }
+                "measurement" => {
+                    measurement = Some(self.parse_measurement_period()?);
+                }
+                "under_load" => {
+                    under_load = Some(self.parse_load_conditions()?);
+                }
+                "verified_by" => {
+                    verified_by = self.parse_verification_methods()?;
+                }
+                _ => {
+                    // Unknown property - store as generic property
+                    let value = if self.check(&Token::LAngle)
+                        || self.check(&Token::LtEq)
+                        || self.check(&Token::RAngle)
+                        || self.check(&Token::GtEq)
+                        || self.check(&Token::EqEq)
+                    {
+                        let t = self.parse_quality_target()?;
+                        QualityPropertyValue::Target(t)
+                    } else {
+                        let ident = self.parse_ident()?;
+                        QualityPropertyValue::Ident(ident)
+                    };
+                    properties.push(QualityProperty {
+                        name: prop_name.clone(),
+                        value,
+                        span: prop_name.span,
+                    });
+                }
+            }
+
             // Optional comma
             if self.check(&Token::Comma) {
                 self.advance()?;
@@ -1104,13 +1145,279 @@ impl<'src> Parser<'src> {
 
         let end = self.expect(&Token::RBrace)?;
 
+        // Metric and target are required
+        let metric = metric.ok_or_else(|| {
+            ParseError::unexpected("metric property in quality block", &Token::RBrace, end)
+        })?;
+        let target = target.ok_or_else(|| {
+            ParseError::unexpected("target property in quality block", &Token::RBrace, end)
+        })?;
+
         Ok(Quality {
             attributes,
             category,
             description,
             metric,
+            scale,
             target,
+            constraint,
+            applies_to,
+            measurement,
+            under_load,
+            verified_by,
             properties,
+            span: start.merge(end),
+        })
+    }
+
+    fn parse_scale(&mut self) -> ParseResult<Scale> {
+        let ident = self.parse_ident()?;
+        match ident.as_str() {
+            "mean" => Ok(Scale::Mean),
+            "median" => Ok(Scale::Median),
+            "p50" => Ok(Scale::P50),
+            "p90" => Ok(Scale::P90),
+            "p95" => Ok(Scale::P95),
+            "p99" => Ok(Scale::P99),
+            "p999" => Ok(Scale::P999),
+            "max" => Ok(Scale::Max),
+            "min" => Ok(Scale::Min),
+            _ => Err(ParseError::unexpected(
+                "scale (mean, median, p50, p90, p95, p99, p999, max, min)",
+                &Token::Ident(ident.name),
+                ident.span,
+            )),
+        }
+    }
+
+    fn parse_constraint(&mut self) -> ParseResult<Constraint> {
+        let ident = self.parse_ident()?;
+        match ident.as_str() {
+            "hard" => Ok(Constraint::Hard),
+            "soft" => Ok(Constraint::Soft),
+            _ => Err(ParseError::unexpected(
+                "constraint (hard, soft)",
+                &Token::Ident(ident.name),
+                ident.span,
+            )),
+        }
+    }
+
+    fn parse_applies_to(&mut self) -> ParseResult<AppliesTo> {
+        let start = self.current_span();
+
+        // Parse kind - these are keywords, not identifiers
+        let kind = if self.check(&Token::Action) {
+            self.advance()?;
+            AppliesToKind::Action
+        } else if self.check(&Token::State) {
+            self.advance()?;
+            AppliesToKind::State
+        } else if self.check(&Token::Type) {
+            self.advance()?;
+            AppliesToKind::Type
+        } else {
+            let found = self.peek().cloned().unwrap_or(Token::RBrace);
+            return Err(ParseError::unexpected(
+                "applies_to kind (action, state, type)",
+                &found,
+                self.current_span(),
+            ));
+        };
+
+        let name = self.parse_ident()?;
+        let span = start.merge(name.span);
+        Ok(AppliesTo { kind, name, span })
+    }
+
+    fn parse_measurement_period(&mut self) -> ParseResult<MeasurementPeriod> {
+        let ident = self.parse_ident()?;
+        match ident.as_str() {
+            "per_request" => Ok(MeasurementPeriod::PerRequest),
+            "per_second" => Ok(MeasurementPeriod::PerSecond),
+            "per_minute" => Ok(MeasurementPeriod::PerMinute),
+            "hourly" => Ok(MeasurementPeriod::Hourly),
+            "daily" => Ok(MeasurementPeriod::Daily),
+            "weekly" => Ok(MeasurementPeriod::Weekly),
+            "monthly" => Ok(MeasurementPeriod::Monthly),
+            _ => Err(ParseError::unexpected(
+                "measurement period (per_request, per_second, per_minute, hourly, daily, weekly, monthly)",
+                &Token::Ident(ident.name),
+                ident.span,
+            )),
+        }
+    }
+
+    fn parse_load_conditions(&mut self) -> ParseResult<LoadConditions> {
+        let start = self.expect(&Token::LBrace)?;
+
+        let mut concurrent_users: Option<i64> = None;
+        let mut concurrent_connections: Option<i64> = None;
+        let mut requests_per_second: Option<i64> = None;
+        let mut payload_size: Option<(i64, SizeUnit)> = None;
+        let mut duration: Option<(i64, DurationUnit)> = None;
+
+        while !self.check(&Token::RBrace) {
+            let prop_name = self.parse_ident()?;
+            self.expect(&Token::Colon)?;
+
+            match prop_name.as_str() {
+                "concurrent_users" => {
+                    concurrent_users = Some(self.parse_integer()?);
+                }
+                "concurrent_connections" => {
+                    concurrent_connections = Some(self.parse_integer()?);
+                }
+                "requests_per_second" => {
+                    requests_per_second = Some(self.parse_integer()?);
+                }
+                "payload_size" => {
+                    let (value, unit) = self.parse_size_value()?;
+                    payload_size = Some((value, unit));
+                }
+                "duration" => {
+                    let (value, unit) = self.parse_duration_value()?;
+                    duration = Some((value, unit));
+                }
+                _ => {
+                    // Skip unknown properties
+                    self.parse_integer().ok();
+                }
+            }
+
+            // Optional comma
+            if self.check(&Token::Comma) {
+                self.advance()?;
+            }
+        }
+
+        let end = self.expect(&Token::RBrace)?;
+
+        Ok(LoadConditions {
+            concurrent_users,
+            concurrent_connections,
+            requests_per_second,
+            payload_size,
+            duration,
+            span: start.merge(end),
+        })
+    }
+
+    fn parse_integer(&mut self) -> ParseResult<i64> {
+        match self.peek() {
+            Some(Token::Integer(n)) => {
+                let n = *n;
+                self.advance()?;
+                Ok(n)
+            }
+            Some(token) => {
+                let token = token.clone();
+                let span = self.current_span();
+                Err(ParseError::unexpected("integer", &token, span))
+            }
+            None => Err(ParseError::unexpected_eof("integer", self.eof_span())),
+        }
+    }
+
+    fn parse_size_value(&mut self) -> ParseResult<(i64, SizeUnit)> {
+        let n = self.parse_integer()?;
+        let unit_ident = self.parse_ident()?;
+        let unit = match unit_ident.as_str().to_lowercase().as_str() {
+            "kb" => SizeUnit::Kb,
+            "mb" => SizeUnit::Mb,
+            "gb" => SizeUnit::Gb,
+            "tb" => SizeUnit::Tb,
+            _ => {
+                return Err(ParseError::unexpected(
+                    "size unit (KB, MB, GB, TB)",
+                    &Token::Ident(unit_ident.name),
+                    unit_ident.span,
+                ))
+            }
+        };
+        Ok((n, unit))
+    }
+
+    fn parse_duration_value(&mut self) -> ParseResult<(i64, DurationUnit)> {
+        let n = self.parse_integer()?;
+        let unit_ident = self.parse_ident()?;
+        let unit = match unit_ident.as_str() {
+            "ms" => DurationUnit::Ms,
+            "s" => DurationUnit::S,
+            "m" => DurationUnit::M,
+            "h" => DurationUnit::H,
+            _ => {
+                return Err(ParseError::unexpected(
+                    "duration unit (ms, s, m, h)",
+                    &Token::Ident(unit_ident.name),
+                    unit_ident.span,
+                ))
+            }
+        };
+        Ok((n, unit))
+    }
+
+    fn parse_verification_methods(&mut self) -> ParseResult<Vec<VerificationMethod>> {
+        self.expect(&Token::LBracket)?;
+
+        let mut methods = Vec::new();
+
+        while !self.check(&Token::RBracket) {
+            let method = self.parse_verification_method()?;
+            methods.push(method);
+
+            // Optional comma
+            if self.check(&Token::Comma) {
+                self.advance()?;
+            }
+        }
+
+        self.expect(&Token::RBracket)?;
+        Ok(methods)
+    }
+
+    fn parse_verification_method(&mut self) -> ParseResult<VerificationMethod> {
+        let start = self.current_span();
+        let kind_ident = self.parse_ident()?;
+        let kind = match kind_ident.as_str() {
+            "test" => VerificationKind::Test,
+            "monitor" => VerificationKind::Monitor,
+            "benchmark" => VerificationKind::Benchmark,
+            "audit" => VerificationKind::Audit,
+            _ => {
+                return Err(ParseError::unexpected(
+                    "verification kind (test, monitor, benchmark, audit)",
+                    &Token::Ident(kind_ident.name),
+                    kind_ident.span,
+                ))
+            }
+        };
+
+        // Parse the name as a string
+        let name = match self.peek() {
+            Some(Token::String(s)) => {
+                let s = s.clone();
+                self.advance()?;
+                s
+            }
+            Some(token) => {
+                let token = token.clone();
+                let span = self.current_span();
+                return Err(ParseError::unexpected("verification name string", &token, span));
+            }
+            None => {
+                return Err(ParseError::unexpected_eof(
+                    "verification name",
+                    self.eof_span(),
+                ))
+            }
+        };
+
+        let end = self.current_span();
+
+        Ok(VerificationMethod {
+            kind,
+            name,
             span: start.merge(end),
         })
     }
@@ -1271,36 +1578,6 @@ impl<'src> Parser<'src> {
             }
             None => Err(ParseError::unexpected_eof("quality value", self.eof_span())),
         }
-    }
-
-    fn parse_quality_property(&mut self) -> ParseResult<QualityProperty> {
-        let name = self.parse_ident()?;
-        let start = name.span;
-        self.expect(&Token::Colon)?;
-
-        // Parse value based on property name
-        let value = if self.check(&Token::LAngle)
-            || self.check(&Token::LtEq)
-            || self.check(&Token::RAngle)
-            || self.check(&Token::GtEq)
-            || self.check(&Token::EqEq)
-        {
-            // It's a target value
-            let target = self.parse_quality_target()?;
-            QualityPropertyValue::Target(target)
-        } else {
-            // It's an identifier value
-            let ident = self.parse_ident()?;
-            QualityPropertyValue::Ident(ident)
-        };
-
-        let end = self.current_span();
-
-        Ok(QualityProperty {
-            name,
-            value,
-            span: start.merge(end),
-        })
     }
 
     // ========== Expressions ==========
@@ -3200,8 +3477,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(spec.qualities.len(), 1);
-        assert_eq!(spec.qualities[0].properties.len(), 1);
-        assert_eq!(spec.qualities[0].properties[0].name.as_str(), "scale");
+        // scale is now a dedicated field, not a property
+        assert_eq!(spec.qualities[0].scale, Some(crate::ast::Scale::P99));
     }
 
     #[test]
@@ -3262,5 +3539,195 @@ mod tests {
             crate::ast::QualityValue::Duration(30, crate::ast::DurationUnit::S) => {}
             _ => panic!("Expected 30s duration"),
         }
+    }
+
+    #[test]
+    fn test_parse_quality_enhanced_fields() {
+        let spec = parse(
+            r#"
+            quality performance "API response time" {
+                metric: latency,
+                scale: p99,
+                target: < 100ms,
+                constraint: hard,
+                applies_to: action register,
+                measurement: per_request,
+                under_load: {
+                    concurrent_users: 1000,
+                    requests_per_second: 500,
+                },
+                verified_by: [
+                    test "load_test_api",
+                    monitor "datadog_latency",
+                ],
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(spec.qualities.len(), 1);
+        let q = &spec.qualities[0];
+
+        // Check metric
+        assert_eq!(q.metric.as_str(), "latency");
+
+        // Check scale
+        assert_eq!(q.scale, Some(crate::ast::Scale::P99));
+
+        // Check target
+        assert_eq!(q.target.op, crate::ast::QualityOp::Lt);
+        match &q.target.value {
+            crate::ast::QualityValue::Duration(100, crate::ast::DurationUnit::Ms) => {}
+            _ => panic!("Expected 100ms duration"),
+        }
+
+        // Check constraint
+        assert_eq!(q.constraint, Some(crate::ast::Constraint::Hard));
+
+        // Check applies_to
+        let applies_to = q.applies_to.as_ref().expect("Expected applies_to");
+        assert_eq!(applies_to.kind, crate::ast::AppliesToKind::Action);
+        assert_eq!(applies_to.name.as_str(), "register");
+
+        // Check measurement
+        assert_eq!(
+            q.measurement,
+            Some(crate::ast::MeasurementPeriod::PerRequest)
+        );
+
+        // Check under_load
+        let load = q.under_load.as_ref().expect("Expected under_load");
+        assert_eq!(load.concurrent_users, Some(1000));
+        assert_eq!(load.requests_per_second, Some(500));
+
+        // Check verified_by
+        assert_eq!(q.verified_by.len(), 2);
+        assert_eq!(q.verified_by[0].kind, crate::ast::VerificationKind::Test);
+        assert_eq!(q.verified_by[0].name.as_str(), "load_test_api");
+        assert_eq!(q.verified_by[1].kind, crate::ast::VerificationKind::Monitor);
+        assert_eq!(q.verified_by[1].name.as_str(), "datadog_latency");
+    }
+
+    #[test]
+    fn test_parse_quality_scale_variants() {
+        let spec = parse(
+            r#"
+            quality performance "p50" { metric: m, target: > 1, scale: p50, }
+            quality performance "p90" { metric: m, target: > 1, scale: p90, }
+            quality performance "p95" { metric: m, target: > 1, scale: p95, }
+            quality performance "p99" { metric: m, target: > 1, scale: p99, }
+            quality performance "p999" { metric: m, target: > 1, scale: p999, }
+            quality performance "mean" { metric: m, target: > 1, scale: mean, }
+            quality performance "median" { metric: m, target: > 1, scale: median, }
+            quality performance "max" { metric: m, target: > 1, scale: max, }
+            quality performance "min" { metric: m, target: > 1, scale: min, }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(spec.qualities.len(), 9);
+        assert_eq!(spec.qualities[0].scale, Some(crate::ast::Scale::P50));
+        assert_eq!(spec.qualities[1].scale, Some(crate::ast::Scale::P90));
+        assert_eq!(spec.qualities[2].scale, Some(crate::ast::Scale::P95));
+        assert_eq!(spec.qualities[3].scale, Some(crate::ast::Scale::P99));
+        assert_eq!(spec.qualities[4].scale, Some(crate::ast::Scale::P999));
+        assert_eq!(spec.qualities[5].scale, Some(crate::ast::Scale::Mean));
+        assert_eq!(spec.qualities[6].scale, Some(crate::ast::Scale::Median));
+        assert_eq!(spec.qualities[7].scale, Some(crate::ast::Scale::Max));
+        assert_eq!(spec.qualities[8].scale, Some(crate::ast::Scale::Min));
+    }
+
+    #[test]
+    fn test_parse_quality_measurement_periods() {
+        let spec = parse(
+            r#"
+            quality reliability "req" { metric: m, target: > 1, measurement: per_request, }
+            quality reliability "sec" { metric: m, target: > 1, measurement: per_second, }
+            quality reliability "min" { metric: m, target: > 1, measurement: per_minute, }
+            quality reliability "hr" { metric: m, target: > 1, measurement: hourly, }
+            quality reliability "day" { metric: m, target: > 1, measurement: daily, }
+            quality reliability "wk" { metric: m, target: > 1, measurement: weekly, }
+            quality reliability "mo" { metric: m, target: > 1, measurement: monthly, }
+            "#,
+        )
+        .unwrap();
+
+        use crate::ast::MeasurementPeriod::*;
+        assert_eq!(spec.qualities.len(), 7);
+        assert_eq!(spec.qualities[0].measurement, Some(PerRequest));
+        assert_eq!(spec.qualities[1].measurement, Some(PerSecond));
+        assert_eq!(spec.qualities[2].measurement, Some(PerMinute));
+        assert_eq!(spec.qualities[3].measurement, Some(Hourly));
+        assert_eq!(spec.qualities[4].measurement, Some(Daily));
+        assert_eq!(spec.qualities[5].measurement, Some(Weekly));
+        assert_eq!(spec.qualities[6].measurement, Some(Monthly));
+    }
+
+    #[test]
+    fn test_parse_quality_verification_kinds() {
+        let spec = parse(
+            r#"
+            quality performance "v" {
+                metric: m,
+                target: > 1,
+                verified_by: [
+                    test "test_name",
+                    monitor "monitor_name",
+                    benchmark "bench_name",
+                    audit "audit_name",
+                ],
+            }
+            "#,
+        )
+        .unwrap();
+
+        let q = &spec.qualities[0];
+        assert_eq!(q.verified_by.len(), 4);
+
+        use crate::ast::VerificationKind::*;
+        assert_eq!(q.verified_by[0].kind, Test);
+        assert_eq!(q.verified_by[0].name.as_str(), "test_name");
+        assert_eq!(q.verified_by[1].kind, Monitor);
+        assert_eq!(q.verified_by[1].name.as_str(), "monitor_name");
+        assert_eq!(q.verified_by[2].kind, Benchmark);
+        assert_eq!(q.verified_by[2].name.as_str(), "bench_name");
+        assert_eq!(q.verified_by[3].kind, Audit);
+        assert_eq!(q.verified_by[3].name.as_str(), "audit_name");
+    }
+
+    #[test]
+    fn test_parse_quality_under_load_all_fields() {
+        let spec = parse(
+            r#"
+            quality performance "load" {
+                metric: m,
+                target: > 1,
+                under_load: {
+                    concurrent_users: 1000,
+                    concurrent_connections: 500,
+                    requests_per_second: 10000,
+                    payload_size: 1 MB,
+                    duration: 5 m,
+                },
+            }
+            "#,
+        )
+        .unwrap();
+
+        let load = spec.qualities[0]
+            .under_load
+            .as_ref()
+            .expect("Expected under_load");
+        assert_eq!(load.concurrent_users, Some(1000));
+        assert_eq!(load.concurrent_connections, Some(500));
+        assert_eq!(load.requests_per_second, Some(10000));
+        assert_eq!(
+            load.payload_size,
+            Some((1, crate::ast::SizeUnit::Mb))
+        );
+        assert_eq!(
+            load.duration,
+            Some((5, crate::ast::DurationUnit::M))
+        );
     }
 }

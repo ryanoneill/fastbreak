@@ -601,7 +601,41 @@ impl<'a> MarkdownGenerator<'a> {
         writeln!(self.output, "**Metric:** `{}`\n", quality.metric).unwrap();
         writeln!(self.output, "**Target:** `{}`\n", quality.target).unwrap();
 
-        // Additional properties
+        // Scale
+        if let Some(scale) = &quality.scale {
+            writeln!(self.output, "**Scale:** {scale}\n").unwrap();
+        }
+
+        // Constraint
+        if let Some(constraint) = &quality.constraint {
+            writeln!(self.output, "**Constraint:** {constraint}\n").unwrap();
+        }
+
+        // Applies to
+        if let Some(applies_to) = &quality.applies_to {
+            writeln!(self.output, "**Applies to:** {applies_to}\n").unwrap();
+        }
+
+        // Measurement
+        if let Some(measurement) = &quality.measurement {
+            writeln!(self.output, "**Measurement:** {measurement}\n").unwrap();
+        }
+
+        // Under load
+        if let Some(under_load) = &quality.under_load {
+            writeln!(self.output, "**Under Load:** {under_load}\n").unwrap();
+        }
+
+        // Verified by
+        if !quality.verified_by.is_empty() {
+            writeln!(self.output, "**Verified by:**\n").unwrap();
+            for method in &quality.verified_by {
+                writeln!(self.output, "- {method}").unwrap();
+            }
+            writeln!(self.output).unwrap();
+        }
+
+        // Additional properties (for extensibility)
         if !quality.properties.is_empty() {
             writeln!(self.output, "**Additional Properties:**\n").unwrap();
             for prop in &quality.properties {
@@ -913,7 +947,7 @@ mod tests {
         assert!(output.contains("**Category:** Performance"));
         assert!(output.contains("**Metric:** `latency`"));
         assert!(output.contains("**Target:** `< 200ms`"));
-        assert!(output.contains("**Additional Properties:**"));
-        assert!(output.contains("- `scale`: p99"));
+        // scale is now a dedicated field, not an additional property
+        assert!(output.contains("**Scale:** p99"));
     }
 }

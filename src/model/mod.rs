@@ -422,6 +422,51 @@ impl<'a> SpecBuilder<'a> {
         for quality in qualities {
             let category = Self::convert_quality_category(quality.category);
             let target = Self::format_quality_target(&quality.target);
+
+            // Format scale
+            let scale = quality.scale.map(|s| s.to_string());
+
+            // Format constraint
+            let constraint = quality.constraint.map(|c| c.to_string());
+
+            // Format applies_to
+            let applies_to = quality
+                .applies_to
+                .as_ref()
+                .map(|a| format!("{} {}", a.kind, a.name.name));
+
+            // Format measurement
+            let measurement = quality.measurement.map(|m| m.to_string());
+
+            // Format under_load
+            let under_load = quality.under_load.as_ref().map(|load| {
+                let mut parts = Vec::new();
+                if let Some(users) = load.concurrent_users {
+                    parts.push(format!("concurrent_users: {users}"));
+                }
+                if let Some(conns) = load.concurrent_connections {
+                    parts.push(format!("concurrent_connections: {conns}"));
+                }
+                if let Some(rps) = load.requests_per_second {
+                    parts.push(format!("requests_per_second: {rps}"));
+                }
+                if let Some((size, unit)) = &load.payload_size {
+                    parts.push(format!("payload_size: {size}{unit}"));
+                }
+                if let Some((dur, unit)) = &load.duration {
+                    parts.push(format!("duration: {dur}{unit}"));
+                }
+                parts.join(", ")
+            });
+
+            // Format verified_by
+            let verified_by = quality
+                .verified_by
+                .iter()
+                .map(|v| format!("{} \"{}\"", v.kind, v.name))
+                .collect();
+
+            // Format additional properties
             let properties = quality
                 .properties
                 .iter()
@@ -436,6 +481,12 @@ impl<'a> SpecBuilder<'a> {
                 description: quality.description.clone(),
                 metric: quality.metric.name.clone(),
                 target,
+                scale,
+                constraint,
+                applies_to,
+                measurement,
+                under_load,
+                verified_by,
                 properties,
                 attributes: Self::compile_attributes(&quality.attributes),
                 span: quality.span,
