@@ -23,13 +23,77 @@ enum PrimitiveType {
 }
 
 // ============================================================================
+// Attributes
+// ============================================================================
+
+// Attribute on definitions: @id("REQ-001"), @deprecated, @since("1.0")
+type Attribute {
+    name: Identifier,
+    args: List<AttributeArg>,
+    span: Span,
+}
+
+// Argument to an attribute
+enum AttributeArg {
+    // String argument: @id("REQ-001")
+    StringArg,
+    // Identifier argument: @category(security)
+    IdentArg,
+    // Integer argument: @priority(1)
+    IntArg,
+}
+
+type StringAttributeArg {
+    value: String,
+}
+
+type IdentAttributeArg {
+    value: Identifier,
+}
+
+type IntAttributeArg {
+    value: Int,
+}
+
+// ============================================================================
 // Type System
 // ============================================================================
 
+// Built-in types provided by the language
+enum BuiltInType {
+    Int,
+    String,
+    Bool,
+    Set,
+    Map,
+    List,
+    Option,
+    Result,
+}
+
 type TypeRef {
-    name: Identifier,
-    generics: List<TypeRef>,
+    kind: TypeRefKind,
     span: Span,
+}
+
+// Kind of type reference
+enum TypeRefKind {
+    // A simple type name or path: User, common::types::Email
+    Named,
+    // A built-in type: Int, String, Bool
+    BuiltIn,
+    // A generic type with arguments: Set<User>, Map<String, Int>
+    Generic,
+    // A function type: (A, B) -> C
+    Function,
+    // A tuple type: (A, B)
+    Tuple,
+    // Unit type: ()
+    Unit,
+}
+
+type GenericArg {
+    ty: TypeRef,
 }
 
 type Field {
@@ -61,6 +125,34 @@ type TypeAlias {
     target: TypeRef,
     refinement: Option<Expression>,
     span: Span,
+}
+
+// ============================================================================
+// Relations
+// ============================================================================
+
+// Relation definition: relation friends: User -> Set<User> { symmetric }
+type Relation {
+    attributes: List<Attribute>,
+    name: Identifier,
+    source: TypeRef,
+    target: TypeRef,
+    constraints: List<RelationConstraint>,
+    span: Span,
+}
+
+// Constraints on relations (Alloy-inspired)
+enum RelationConstraint {
+    // The relation is symmetric: a R b implies b R a
+    Symmetric,
+    // The relation is reflexive: a R a for all a
+    Reflexive,
+    // The relation is irreflexive: not (a R a) for all a
+    Irreflexive,
+    // The relation is transitive: a R b and b R c implies a R c
+    Transitive,
+    // The relation is antisymmetric: a R b and b R a implies a = b
+    Antisymmetric,
 }
 
 // ============================================================================
@@ -178,7 +270,7 @@ type Property {
 }
 
 // ============================================================================
-// Expressions (simplified)
+// Expressions
 // ============================================================================
 
 type Expression {
@@ -186,17 +278,161 @@ type Expression {
     span: Span,
 }
 
+// Full enumeration of expression kinds
 enum ExpressionKind {
+    // Literals: integers, strings, booleans, unit
     Literal,
-    Identifier,
-    BinaryOp,
-    UnaryOp,
+    // Identifier reference
+    Ident,
+    // Binary operation: left op right
+    Binary,
+    // Unary operation: op expr
+    Unary,
+    // Function/method call: f(args)
     Call,
+    // Field access: expr.field
     FieldAccess,
-    Quantifier,
+    // Index access: expr[index]
+    Index,
+    // Match expression: match expr { arms }
     Match,
+    // If expression: if cond { then } else { else }
+    If,
+    // Block expression: { stmts; expr }
     Block,
+    // List literal: [a, b, c]
+    List,
+    // Set literal: {a, b, c}
+    SetLiteral,
+    // Map literal: {k1: v1, k2: v2}
+    MapLiteral,
+    // Struct literal: Type { field: value }
+    Struct,
+    // Tuple literal: (a, b, c)
+    Tuple,
+    // Lambda: |params| body
+    Lambda,
+    // Let binding: let x = expr
+    Let,
+    // Quantifier: forall/exists
+    Quantifier,
+    // Range: start..end or start..=end
+    Range,
+    // Type check: expr is Type
+    Is,
+    // Unwrap: expr.unwrap() or expr?
+    Unwrap,
+    // Old value in postcondition: old(expr)
+    Old,
+    // Next state value: expr'
+    Prime,
 }
+
+// ============================================================================
+// Operators
+// ============================================================================
+
+enum BinaryOp {
+    // Arithmetic operators
+    Add,        // +
+    Sub,        // -
+    Mul,        // *
+    Div,        // /
+    Mod,        // %
+    // Comparison operators
+    Eq,         // ==
+    NotEq,      // !=
+    Lt,         // <
+    LtEq,       // <=
+    Gt,         // >
+    GtEq,       // >=
+    // Logical operators
+    And,        // and
+    Or,         // or
+    Implies,    // =>
+    // Set/collection operators
+    In,         // in
+    Union,      // union
+    Intersect,  // intersect
+    Difference, // difference / setminus
+}
+
+enum UnaryOp {
+    // Logical negation: not expr
+    Not,
+    // Arithmetic negation: -expr
+    Neg,
+}
+
+// ============================================================================
+// Literals
+// ============================================================================
+
+enum Literal {
+    // Integer literal: 42, -1
+    Int,
+    // String literal: "hello"
+    StringLit,
+    // Boolean literal: true, false
+    Bool,
+    // Unit/empty tuple: ()
+    Unit,
+}
+
+type IntLiteral {
+    value: Int,
+}
+
+type StringLiteral {
+    value: String,
+}
+
+type BoolLiteral {
+    value: Bool,
+}
+
+// ============================================================================
+// Quantifiers
+// ============================================================================
+
+enum QuantifierKind {
+    // Universal: forall x in xs => predicate
+    ForAll,
+    // Existential: exists x in xs where predicate
+    Exists,
+}
+
+type QuantBinding {
+    name: Identifier,
+    kind: QuantBindingKind,
+    span: Span,
+}
+
+enum QuantBindingKind {
+    // x in collection
+    InCollection,
+    // x: Type
+    Typed,
+}
+
+// ============================================================================
+// Lambdas and Calls
+// ============================================================================
+
+type LambdaParam {
+    name: Identifier,
+    param_type: Option<TypeRef>,
+}
+
+type FieldInit {
+    name: Identifier,
+    value: Expression,
+    span: Span,
+}
+
+// ============================================================================
+// Match and Patterns
+// ============================================================================
 
 type MatchArm {
     pattern: Pattern,
@@ -211,11 +447,24 @@ type Pattern {
 }
 
 enum PatternKind {
+    // Wildcard: _
     Wildcard,
+    // Literal pattern: 42, "hello", true
     Literal,
-    Identifier,
+    // Binding pattern: x, name
+    Binding,
+    // Variant pattern: Some(x), None
     Variant,
+    // Struct pattern: User { id, name }
     Struct,
+    // Tuple pattern: (a, b, c)
+    Tuple,
+}
+
+type FieldPattern {
+    name: Identifier,
+    pattern: Option<Pattern>,
+    span: Span,
 }
 
 type BlockExpression {
@@ -288,363 +537,4 @@ type Specification {
     actions: List<ActionDefinition>,
     scenarios: List<Scenario>,
     properties: List<Property>,
-}
-
-// ============================================================================
-// State: Compiler Pipeline
-// ============================================================================
-
-state CompilerPipeline {
-    source_files: Set<String>,
-    parsed_specs: Map<String, Specification>,
-    errors: List<String>,
-
-    invariant "All parsed specs have source files" {
-        forall path in parsed_specs.keys() =>
-            path in source_files
-    }
-}
-
-// ============================================================================
-// Actions: Compiler Operations
-// ============================================================================
-
-action parse(source: String) -> Result<Specification, String>
-    ensures {
-        match result {
-            Ok(spec) => spec.types.len() >= 0,
-            Err(msg) => msg.len() > 0,
-        }
-    }
-
-action analyze(spec: Specification) -> List<String>
-    ensures {
-        // Returns list of semantic errors (empty if valid)
-        result.len() >= 0
-    }
-
-action compile(spec: Specification) -> CompiledSpec
-    requires {
-        // Specification must pass semantic analysis
-        analyze(spec).len() == 0
-    }
-
-action generate_markdown(spec: CompiledSpec) -> String
-    ensures {
-        result.len() > 0
-    }
-
-action generate_diagram(spec: CompiledSpec, diagram_type: DiagramType) -> String
-    ensures {
-        result.len() > 0
-    }
-
-action build_module_registry(specs: List<Specification>) -> ModuleRegistry
-    ensures {
-        // All modules from input specs are registered
-        forall spec in specs where spec.module is Some =>
-            result.modules.contains_key(spec.module.unwrap().name)
-    }
-
-action resolve_imports(registry: ModuleRegistry, module_name: String) -> List<String>
-    requires {
-        registry.modules.contains_key(module_name)
-    }
-    ensures {
-        // Returns list of unresolved import errors (empty if all resolved)
-        result.len() >= 0
-    }
-
-// ============================================================================
-// Supporting Types for Actions
-// ============================================================================
-
-type CompiledSpec {
-    name: String,
-    structs: List<CompiledStruct>,
-    enums: List<CompiledEnum>,
-    states: List<CompiledState>,
-    actions: List<CompiledAction>,
-    scenarios: List<CompiledScenario>,
-    properties: List<CompiledProperty>,
-}
-
-type CompiledStruct {
-    name: String,
-    fields: List<CompiledField>,
-}
-
-type CompiledField {
-    name: String,
-    field_type: String,
-}
-
-type CompiledEnum {
-    name: String,
-    variants: List<String>,
-}
-
-type CompiledState {
-    name: String,
-    fields: List<CompiledField>,
-    invariants: List<String>,
-}
-
-type CompiledAction {
-    name: String,
-    parameters: List<CompiledField>,
-    return_type: Option<String>,
-    preconditions: List<String>,
-    postconditions: List<String>,
-}
-
-type CompiledScenario {
-    description: String,
-    given: List<String>,
-    when_action: List<String>,
-    then_assertions: List<String>,
-}
-
-type CompiledProperty {
-    description: String,
-    temporal_op: Option<String>,
-    expression: String,
-}
-
-enum DiagramType {
-    Erd,
-    State,
-    Sequence,
-}
-
-// ============================================================================
-// Scenarios: Usage Examples
-// ============================================================================
-
-scenario "Parse a simple type definition" {
-    given {
-        source = "type User { id: Int, name: String }"
-    }
-    when {
-        result = parse(source)
-    }
-    then {
-        result is Ok
-        result.unwrap().types.len() == 1
-    }
-}
-
-scenario "Parse a state with invariant" {
-    given {
-        // Note: Source contains a state with invariant
-        source = "state System { users: Set<User> }"
-    }
-    when {
-        result = parse(source)
-    }
-    then {
-        result is Ok
-        result.unwrap().states.len() == 1
-    }
-}
-
-scenario "Parse dotted module name" {
-    given {
-        source = "module abc.def.ghi\n\ntype User { id: Int }"
-    }
-    when {
-        result = parse(source)
-    }
-    then {
-        result is Ok
-        result.unwrap().module is Some
-        result.unwrap().module.unwrap().name.segments.len() == 3
-    }
-}
-
-scenario "Generate documentation from compiled spec" {
-    given {
-        spec = CompiledSpec {
-            name: "test",
-            structs: [],
-            enums: [],
-            states: [],
-            actions: [],
-            scenarios: [],
-            properties: [],
-        }
-    }
-    when {
-        markdown = generate_markdown(spec)
-    }
-    then {
-        markdown.len() > 0
-    }
-}
-
-scenario "Cross-file type import" {
-    given {
-        // File 1: defines shared types
-        types_file = "module types\n\ntype UserId { value: Int }\ntype Email { address: String }"
-        // File 2: imports and uses the types
-        users_file = "module users\n\nuse types::{UserId, Email}\n\ntype User { id: UserId, email: Email }"
-    }
-    when {
-        types_spec = parse(types_file)
-        users_spec = parse(users_file)
-        registry = build_module_registry([types_spec.unwrap(), users_spec.unwrap()])
-    }
-    then {
-        // UserId and Email should be available in the users module
-        registry.is_type_available("users", "UserId")
-        registry.is_type_available("users", "Email")
-        registry.is_type_available("users", "User")
-    }
-}
-
-scenario "Import with alias" {
-    given {
-        types_file = "module types\n\ntype Identifier { value: String }"
-        users_file = "module users\n\nuse types::{Identifier as Id}\n\ntype User { id: Id }"
-    }
-    when {
-        types_spec = parse(types_file)
-        users_spec = parse(users_file)
-        registry = build_module_registry([types_spec.unwrap(), users_spec.unwrap()])
-    }
-    then {
-        // Id should be available (aliased from Identifier)
-        registry.is_type_available("users", "Id")
-    }
-}
-
-// ============================================================================
-// Properties: System Guarantees
-// ============================================================================
-
-property "Parsing is deterministic" {
-    always {
-        forall source: String =>
-            parse(source) == parse(source)
-    }
-}
-
-property "Valid specs produce no errors" {
-    always {
-        forall spec: Specification where analyze(spec).len() == 0 =>
-            compile(spec) is Ok
-    }
-}
-
-property "Type names are unique within a specification" {
-    always {
-        forall spec: Specification, t1, t2 in spec.types where t1 != t2 =>
-            t1.name != t2.name
-    }
-}
-
-property "Imported types must exist in source module" {
-    always {
-        forall registry: ModuleRegistry, import in registry.current_module_info().imports =>
-            forall item in import.items =>
-                registry.get_module(import.source_module).types.contains(item.original_name)
-    }
-}
-
-// ============================================================================
-// Error Reporting
-// ============================================================================
-
-type SourceLocation {
-    line: Int,
-    column: Int,
-}
-
-type ErrorContext {
-    path: String,
-    source: String,
-    location: SourceLocation,
-}
-
-enum ErrorKind {
-    Parse,
-    Semantic,
-    Io,
-}
-
-type CompilerError {
-    kind: ErrorKind,
-    message: String,
-    context: Option<ErrorContext>,
-}
-
-action compute_location(source: String, byte_offset: Int) -> SourceLocation
-    requires {
-        byte_offset >= 0 and byte_offset <= source.len()
-    }
-    ensures {
-        result.line >= 1 and result.column >= 1
-    }
-
-action format_error(error: CompilerError) -> String
-    ensures {
-        // Error messages must include location when context is available
-        match error.context {
-            Some(ctx) => result.contains(ctx.location.line.to_string()),
-            None => true,
-        }
-    }
-
-scenario "Parse match with block body" {
-    given {
-        source = "state Test { x: Int, invariant { match x { 0 => { false }, _ => { x > 0 } } } }"
-    }
-    when {
-        result = parse(source)
-    }
-    then {
-        result is Ok
-    }
-}
-
-scenario "Parse error includes line number" {
-    given {
-        source = "type User {\n    id: Int,\n    invalid syntax\n}"
-    }
-    when {
-        result = parse(source)
-    }
-    then {
-        result is Err
-        // Error message should contain line number
-    }
-}
-
-property "All errors with spans have valid line numbers" {
-    always {
-        forall error: CompilerError where error.context is Some =>
-            error.context.unwrap().location.line >= 1
-    }
-}
-
-// ============================================================================
-// Quality Requirements
-// ============================================================================
-
-@id("NFR-001")
-quality performance "Parse time for typical specs" {
-    metric: latency,
-    target: < 100ms,
-}
-
-@id("NFR-002")
-quality reliability "Parser handles malformed input gracefully" {
-    metric: error_handling,
-    target: == 100%,
-}
-
-@id("NFR-003")
-quality maintainability "Code coverage" {
-    metric: test_coverage,
-    target: >= 80%,
 }
