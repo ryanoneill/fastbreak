@@ -95,3 +95,89 @@ impl From<Span> for miette::SourceSpan {
         (span.start, span.end.saturating_sub(span.start)).into()
     }
 }
+
+/// A human-readable source location (1-indexed line and column)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceLocation {
+    /// Line number (1-indexed)
+    pub line: usize,
+    /// Column number (1-indexed)
+    pub column: usize,
+}
+
+impl SourceLocation {
+    /// Compute the line and column for a byte offset in source text
+    #[must_use]
+    pub fn from_offset(source: &str, offset: usize) -> Self {
+        let offset = offset.min(source.len());
+        let mut line = 1;
+        let mut column = 1;
+
+        for (i, ch) in source.char_indices() {
+            if i >= offset {
+                break;
+            }
+            if ch == '\n' {
+                line += 1;
+                column = 1;
+            } else {
+                column += 1;
+            }
+        }
+
+        Self { line, column }
+    }
+}
+
+impl std::fmt::Display for SourceLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.line, self.column)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_source_location_first_line() {
+        let source = "hello world";
+        let loc = SourceLocation::from_offset(source, 0);
+        assert_eq!(loc.line, 1);
+        assert_eq!(loc.column, 1);
+
+        let loc = SourceLocation::from_offset(source, 6);
+        assert_eq!(loc.line, 1);
+        assert_eq!(loc.column, 7);
+    }
+
+    #[test]
+    fn test_source_location_multiline() {
+        let source = "line1\nline2\nline3";
+        // Start of line 1
+        let loc = SourceLocation::from_offset(source, 0);
+        assert_eq!(loc.line, 1);
+        assert_eq!(loc.column, 1);
+
+        // End of line 1 (before \n)
+        let loc = SourceLocation::from_offset(source, 5);
+        assert_eq!(loc.line, 1);
+        assert_eq!(loc.column, 6);
+
+        // Start of line 2 (after \n)
+        let loc = SourceLocation::from_offset(source, 6);
+        assert_eq!(loc.line, 2);
+        assert_eq!(loc.column, 1);
+
+        // Middle of line 3
+        let loc = SourceLocation::from_offset(source, 14);
+        assert_eq!(loc.line, 3);
+        assert_eq!(loc.column, 3);
+    }
+
+    #[test]
+    fn test_source_location_display() {
+        let loc = SourceLocation { line: 10, column: 25 };
+        assert_eq!(format!("{loc}"), "10:25");
+    }
+}

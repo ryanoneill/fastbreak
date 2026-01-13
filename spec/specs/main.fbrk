@@ -404,6 +404,70 @@ property "Type names are unique within a specification" {
 }
 
 // ============================================================================
+// Error Reporting
+// ============================================================================
+
+type SourceLocation {
+    line: Int,
+    column: Int,
+}
+
+type ErrorContext {
+    path: String,
+    source: String,
+    location: SourceLocation,
+}
+
+enum ErrorKind {
+    Parse,
+    Semantic,
+    Io,
+}
+
+type CompilerError {
+    kind: ErrorKind,
+    message: String,
+    context: Option<ErrorContext>,
+}
+
+action compute_location(source: String, byte_offset: Int) -> SourceLocation
+    requires {
+        byte_offset >= 0 and byte_offset <= source.len()
+    }
+    ensures {
+        result.line >= 1 and result.column >= 1
+    }
+
+action format_error(error: CompilerError) -> String
+    ensures {
+        // Error messages must include location when context is available
+        match error.context {
+            Some(ctx) => result.contains(ctx.location.line.to_string()),
+            None => true,
+        }
+    }
+
+scenario "Parse error includes line number" {
+    given {
+        source = "type User {\n    id: Int,\n    invalid syntax\n}"
+    }
+    when {
+        result = parse(source)
+    }
+    then {
+        result is Err
+        // Error message should contain line number
+    }
+}
+
+property "All errors with spans have valid line numbers" {
+    always {
+        forall error: CompilerError where error.context is Some =>
+            error.context.unwrap().location.line >= 1
+    }
+}
+
+// ============================================================================
 // Quality Requirements
 // ============================================================================
 

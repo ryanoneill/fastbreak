@@ -7,6 +7,7 @@ use crate::ast::Specification;
 use crate::model::{compile, CompiledSpec};
 use crate::parser::{self, ParseError};
 use crate::semantic::{self, Analyzer, ModuleRegistry};
+use crate::SourceLocation;
 use indexmap::IndexMap;
 use smol_str::SmolStr;
 use std::path::{Path, PathBuf};
@@ -131,6 +132,7 @@ impl Loader {
 
         let ast = parser::parse(&source).map_err(|e| LoadError::Parse {
             path: path.to_path_buf(),
+            source_text: source.clone(),
             error: e,
         })?;
 
@@ -196,6 +198,7 @@ impl Loader {
 
             let ast = parser::parse(&source).map_err(|e| LoadError::Parse {
                 path: path.clone(),
+                source_text: source.clone(),
                 error: e,
             })?;
 
@@ -337,6 +340,8 @@ pub enum LoadError {
     Parse {
         /// Path that caused the error
         path: PathBuf,
+        /// Source text (for computing line numbers)
+        source_text: String,
         /// Parse error
         error: ParseError,
     },
@@ -354,8 +359,19 @@ impl std::fmt::Display for LoadError {
             LoadError::Io { path, source } => {
                 write!(f, "IO error reading {}: {}", path.display(), source)
             }
-            LoadError::Parse { path, error } => {
-                write!(f, "Parse error in {}: {}", path.display(), error)
+            LoadError::Parse {
+                path,
+                source_text,
+                error,
+            } => {
+                let location = SourceLocation::from_offset(source_text, error.span().start);
+                write!(
+                    f,
+                    "Parse error in {}:{}: {}",
+                    path.display(),
+                    location,
+                    error
+                )
             }
             LoadError::NoSources { dir } => {
                 write!(f, "No source files found in {}", dir.display())
