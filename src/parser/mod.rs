@@ -2479,7 +2479,8 @@ impl<'src> Parser<'src> {
         let first = self.parse_ident()?;
         let mut segments = vec![first];
 
-        while self.check(&Token::ColonColon) {
+        // Only consume `::` if followed by an identifier (not `{` for import groups)
+        while self.check(&Token::ColonColon) && !self.check_ahead(1, &Token::LBrace) {
             self.advance()?;
             segments.push(self.parse_ident()?);
         }

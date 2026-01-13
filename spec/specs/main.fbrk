@@ -239,8 +239,48 @@ type Module {
     span: Span,
 }
 
+// Import statement: use path::to::module::{Item, AnotherItem as Alias}
+type Import {
+    path: ModulePath,
+    items: Option<List<ImportItem>>,
+    span: Span,
+}
+
+type ImportItem {
+    name: Identifier,
+    alias: Option<Identifier>,
+    span: Span,
+}
+
+// Resolved import after cross-module resolution
+type ResolvedImport {
+    source_module: String,
+    items: List<ImportedItem>,
+}
+
+type ImportedItem {
+    original_name: String,
+    local_name: String,
+}
+
+// Module registry for tracking definitions across files
+type ModuleRegistry {
+    modules: Map<String, ModuleInfo>,
+    current_module: Option<String>,
+}
+
+type ModuleInfo {
+    name: String,
+    types: Set<String>,
+    enums: Set<String>,
+    states: Set<String>,
+    actions: Set<String>,
+    imports: List<ResolvedImport>,
+}
+
 type Specification {
     module: Option<Module>,
+    imports: List<Import>,
     types: List<TypeDefinition>,
     enums: List<EnumDefinition>,
     type_aliases: List<TypeAlias>,
@@ -297,6 +337,22 @@ action generate_markdown(spec: CompiledSpec) -> String
 action generate_diagram(spec: CompiledSpec, diagram_type: DiagramType) -> String
     ensures {
         result.len() > 0
+    }
+
+action build_module_registry(specs: List<Specification>) -> ModuleRegistry
+    ensures {
+        // All modules from input specs are registered
+        forall spec in specs where spec.module is Some =>
+            result.modules.contains_key(spec.module.unwrap().name)
+    }
+
+action resolve_imports(registry: ModuleRegistry, module_name: String) -> List<String>
+    requires {
+        registry.modules.contains_key(module_name)
+    }
+    ensures {
+        // Returns list of unresolved import errors (empty if all resolved)
+        result.len() >= 0
     }
 
 // ============================================================================
@@ -426,6 +482,42 @@ scenario "Generate documentation from compiled spec" {
     }
 }
 
+scenario "Cross-file type import" {
+    given {
+        // File 1: defines shared types
+        types_file = "module types\n\ntype UserId { value: Int }\ntype Email { address: String }"
+        // File 2: imports and uses the types
+        users_file = "module users\n\nuse types::{UserId, Email}\n\ntype User { id: UserId, email: Email }"
+    }
+    when {
+        types_spec = parse(types_file)
+        users_spec = parse(users_file)
+        registry = build_module_registry([types_spec.unwrap(), users_spec.unwrap()])
+    }
+    then {
+        // UserId and Email should be available in the users module
+        registry.is_type_available("users", "UserId")
+        registry.is_type_available("users", "Email")
+        registry.is_type_available("users", "User")
+    }
+}
+
+scenario "Import with alias" {
+    given {
+        types_file = "module types\n\ntype Identifier { value: String }"
+        users_file = "module users\n\nuse types::{Identifier as Id}\n\ntype User { id: Id }"
+    }
+    when {
+        types_spec = parse(types_file)
+        users_spec = parse(users_file)
+        registry = build_module_registry([types_spec.unwrap(), users_spec.unwrap()])
+    }
+    then {
+        // Id should be available (aliased from Identifier)
+        registry.is_type_available("users", "Id")
+    }
+}
+
 // ============================================================================
 // Properties: System Guarantees
 // ============================================================================
@@ -448,6 +540,14 @@ property "Type names are unique within a specification" {
     always {
         forall spec: Specification, t1, t2 in spec.types where t1 != t2 =>
             t1.name != t2.name
+    }
+}
+
+property "Imported types must exist in source module" {
+    always {
+        forall registry: ModuleRegistry, import in registry.current_module_info().imports =>
+            forall item in import.items =>
+                registry.get_module(import.source_module).types.contains(item.original_name)
     }
 }
 

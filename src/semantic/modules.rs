@@ -52,6 +52,49 @@ pub struct ImportedItem {
     pub local_name: SmolStr,
 }
 
+/// Error during import resolution
+#[derive(Debug, Clone, PartialEq)]
+pub enum ImportError {
+    /// The source module doesn't exist
+    ModuleNotFound {
+        /// Module that contains the import
+        importing_module: SmolStr,
+        /// Module that was not found
+        source_module: SmolStr,
+    },
+    /// An imported item doesn't exist in the source module
+    ItemNotFound {
+        /// Module that contains the import
+        importing_module: SmolStr,
+        /// Module being imported from
+        source_module: SmolStr,
+        /// Item that was not found
+        item_name: SmolStr,
+    },
+}
+
+impl std::fmt::Display for ImportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ImportError::ModuleNotFound {
+                importing_module,
+                source_module,
+            } => write!(
+                f,
+                "module '{importing_module}' imports from '{source_module}', but module '{source_module}' does not exist"
+            ),
+            ImportError::ItemNotFound {
+                importing_module,
+                source_module,
+                item_name,
+            } => write!(
+                f,
+                "module '{importing_module}' imports '{item_name}' from '{source_module}', but '{item_name}' is not defined in '{source_module}'"
+            ),
+        }
+    }
+}
+
 impl ModuleRegistry {
     /// Create a new empty module registry
     #[must_use]
@@ -59,24 +102,45 @@ impl ModuleRegistry {
         Self::default()
     }
 
-    /// Build a registry from a specification
+    /// Build a registry from a single specification
     #[must_use]
     pub fn from_spec(spec: &Specification) -> Self {
         let mut registry = Self::new();
+        registry.register_spec(spec);
+        registry
+    }
 
+    /// Build a registry from multiple specifications (for multi-file projects)
+    #[must_use]
+    pub fn from_specs(specs: &[&Specification]) -> Self {
+        let mut registry = Self::new();
+        for spec in specs {
+            registry.register_spec(spec);
+        }
+        registry
+    }
+
+    /// Register a specification's definitions in this registry
+    pub fn register_spec(&mut self, spec: &Specification) {
         // Determine the module name
         let module_name = spec
             .module
             .as_ref()
             .map_or_else(|| SmolStr::new("default"), Module::name);
 
-        registry.current_module = Some(module_name.clone());
+        // Set current module if not already set
+        if self.current_module.is_none() {
+            self.current_module = Some(module_name.clone());
+        }
 
-        // Create module info
-        let mut info = ModuleInfo {
-            name: module_name.clone(),
-            ..Default::default()
-        };
+        // Get or create module info
+        let info = self
+            .modules
+            .entry(module_name.clone())
+            .or_insert_with(|| ModuleInfo {
+                name: module_name,
+                ..Default::default()
+            });
 
         // Register all types
         for type_def in &spec.types {
@@ -112,9 +176,11 @@ impl ModuleRegistry {
         for import in &spec.imports {
             info.imports.push(Self::resolve_import(import));
         }
+    }
 
-        registry.modules.insert(module_name, info);
-        registry
+    /// Set the current module context for type resolution
+    pub fn set_current_module(&mut self, module_name: &str) {
+        self.current_module = Some(SmolStr::new(module_name));
     }
 
     /// Resolve an import statement to a `ResolvedImport`
@@ -173,47 +239,136 @@ impl ModuleRegistry {
     /// Check if a type is defined in the current module or imported
     #[must_use]
     pub fn is_type_available(&self, name: &str) -> bool {
-        if let Some(info) = self.current_module_info() {
-            // Check local definitions
-            if info.types.contains(name) {
-                return true;
-            }
+        self.is_type_available_in(self.current_module.as_deref(), name)
+    }
 
-            // Check imports
-            for import in &info.imports {
-                // Wildcard import - would need to check source module
-                if import.items.is_empty() {
-                    // For now, assume it might be available
-                    return true;
+    /// Check if a type is available in a specific module
+    #[must_use]
+    pub fn is_type_available_in(&self, module_name: Option<&str>, name: &str) -> bool {
+        let module_name = module_name.unwrap_or("default");
+        let Some(info) = self.modules.get(module_name) else {
+            return false;
+        };
+
+        // Check local definitions
+        if info.types.contains(name) {
+            return true;
+        }
+
+        // Check imports
+        for import in &info.imports {
+            // Get the source module info to verify the type exists
+            let source_module = self.modules.get(import.source_module.as_str());
+
+            if import.items.is_empty() {
+                // Wildcard import - check if the type exists in source module
+                if let Some(source) = source_module {
+                    if source.types.contains(name) || source.enums.contains(name) {
+                        return true;
+                    }
                 }
-
-                // Named import
-                if import.items.iter().any(|item| item.local_name == name) {
-                    return true;
+            } else {
+                // Named import - check if this name is imported
+                for item in &import.items {
+                    if item.local_name == name {
+                        // Verify the original name exists in the source module
+                        if let Some(source) = source_module {
+                            if source.types.contains(item.original_name.as_str())
+                                || source.enums.contains(item.original_name.as_str())
+                            {
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
         }
+
         false
     }
 
     /// Check if an enum is defined in the current module or imported
     #[must_use]
     pub fn is_enum_available(&self, name: &str) -> bool {
-        if let Some(info) = self.current_module_info() {
-            if info.enums.contains(name) {
-                return true;
-            }
+        self.is_enum_available_in(self.current_module.as_deref(), name)
+    }
 
-            for import in &info.imports {
-                if import.items.is_empty() {
-                    return true;
+    /// Check if an enum is available in a specific module
+    #[must_use]
+    pub fn is_enum_available_in(&self, module_name: Option<&str>, name: &str) -> bool {
+        let module_name = module_name.unwrap_or("default");
+        let Some(info) = self.modules.get(module_name) else {
+            return false;
+        };
+
+        // Check local definitions
+        if info.enums.contains(name) {
+            return true;
+        }
+
+        // Check imports
+        for import in &info.imports {
+            let source_module = self.modules.get(import.source_module.as_str());
+
+            if import.items.is_empty() {
+                // Wildcard import
+                if let Some(source) = source_module {
+                    if source.enums.contains(name) {
+                        return true;
+                    }
                 }
-                if import.items.iter().any(|item| item.local_name == name) {
-                    return true;
+            } else {
+                // Named import
+                for item in &import.items {
+                    if item.local_name == name {
+                        if let Some(source) = source_module {
+                            if source.enums.contains(item.original_name.as_str()) {
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
         }
+
         false
+    }
+
+    /// Validate all imports in the registry and return unresolved imports
+    #[must_use]
+    pub fn validate_imports(&self) -> Vec<ImportError> {
+        let mut errors = Vec::new();
+
+        for (module_name, info) in &self.modules {
+            for import in &info.imports {
+                // Check if source module exists
+                let Some(source) = self.modules.get(import.source_module.as_str()) else {
+                    errors.push(ImportError::ModuleNotFound {
+                        importing_module: module_name.clone(),
+                        source_module: import.source_module.clone(),
+                    });
+                    continue;
+                };
+
+                // Validate each imported item exists in the source module
+                for item in &import.items {
+                    let exists = source.types.contains(item.original_name.as_str())
+                        || source.enums.contains(item.original_name.as_str())
+                        || source.states.contains(item.original_name.as_str())
+                        || source.actions.contains(item.original_name.as_str());
+
+                    if !exists {
+                        errors.push(ImportError::ItemNotFound {
+                            importing_module: module_name.clone(),
+                            source_module: import.source_module.clone(),
+                            item_name: item.original_name.clone(),
+                        });
+                    }
+                }
+            }
+        }
+
+        errors
     }
 
     /// Resolve a qualified name like `auth::User`
@@ -350,5 +505,147 @@ mod tests {
         let registry = ModuleRegistry::from_spec(&spec);
 
         assert_eq!(registry.current_module(), Some(&SmolStr::new("default")));
+    }
+
+    #[test]
+    fn test_cross_file_imports() {
+        // First file defines shared types
+        let types_spec = parse(
+            r#"
+            module types
+
+            type UserId { value: Int }
+            type Email { address: String }
+            "#,
+        )
+        .unwrap();
+
+        // Second file imports and uses the types
+        let users_spec = parse(
+            r#"
+            module users
+
+            use types::{UserId, Email}
+
+            type User {
+                id: UserId,
+                email: Email,
+            }
+            "#,
+        )
+        .unwrap();
+
+        // Build registry from both specs
+        let registry = ModuleRegistry::from_specs(&[&types_spec, &users_spec]);
+
+        // Check that both modules are registered
+        assert!(registry.get_module("types").is_some());
+        assert!(registry.get_module("users").is_some());
+
+        // Check types are defined in the types module
+        let types_info = registry.get_module("types").unwrap();
+        assert!(types_info.types.contains("UserId"));
+        assert!(types_info.types.contains("Email"));
+
+        // Check that imported types are available in users module
+        assert!(registry.is_type_available_in(Some("users"), "UserId"));
+        assert!(registry.is_type_available_in(Some("users"), "Email"));
+        assert!(registry.is_type_available_in(Some("users"), "User"));
+
+        // Validate imports should succeed
+        let errors = registry.validate_imports();
+        assert!(errors.is_empty(), "Expected no import errors: {errors:?}");
+    }
+
+    #[test]
+    fn test_import_validation_missing_module() {
+        let spec = parse(
+            r#"
+            module test
+
+            use nonexistent::{Foo}
+
+            type Bar { id: Int }
+            "#,
+        )
+        .unwrap();
+
+        let registry = ModuleRegistry::from_spec(&spec);
+        let errors = registry.validate_imports();
+
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(
+            &errors[0],
+            ImportError::ModuleNotFound { source_module, .. }
+            if source_module == "nonexistent"
+        ));
+    }
+
+    #[test]
+    fn test_import_validation_missing_item() {
+        let types_spec = parse(
+            r#"
+            module types
+
+            type UserId { value: Int }
+            "#,
+        )
+        .unwrap();
+
+        let users_spec = parse(
+            r#"
+            module users
+
+            use types::{UserId, NonExistent}
+
+            type User { id: UserId }
+            "#,
+        )
+        .unwrap();
+
+        let registry = ModuleRegistry::from_specs(&[&types_spec, &users_spec]);
+        let errors = registry.validate_imports();
+
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(
+            &errors[0],
+            ImportError::ItemNotFound { item_name, .. }
+            if item_name == "NonExistent"
+        ));
+    }
+
+    #[test]
+    fn test_import_with_alias() {
+        let types_spec = parse(
+            r#"
+            module types
+
+            type Identifier { value: String }
+            "#,
+        )
+        .unwrap();
+
+        let users_spec = parse(
+            r#"
+            module users
+
+            use types::{Identifier as Id}
+
+            type User { id: Id }
+            "#,
+        )
+        .unwrap();
+
+        let registry = ModuleRegistry::from_specs(&[&types_spec, &users_spec]);
+
+        // Id should be available (aliased from Identifier)
+        assert!(registry.is_type_available_in(Some("users"), "Id"));
+
+        // Identifier should NOT be directly available (it's aliased)
+        assert!(!registry.is_type_available_in(Some("users"), "Identifier"));
+
+        // No import errors
+        let errors = registry.validate_imports();
+        assert!(errors.is_empty());
     }
 }
