@@ -891,9 +891,12 @@ impl Analyzer {
             ExprKind::Let { name, ty, value, body } => {
                 self.check_let(name, ty.as_ref(), value, body, expr.span)
             }
-            ExprKind::Is { expr: inner, ty: _ } => {
+            ExprKind::Is {
+                expr: inner,
+                pattern: _,
+            } => {
                 self.check_expr(inner);
-                // `is` expressions always return Bool (type path validation is done during parsing)
+                // `is` expressions always return Bool (pattern validation is done during parsing)
                 Type::Bool
             }
             ExprKind::Block(exprs) => {

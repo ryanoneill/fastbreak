@@ -1671,15 +1671,15 @@ impl<'src> Parser<'src> {
             );
         }
 
-        // Handle `is` type check
+        // Handle `is` pattern check
         if self.check(&Token::Is) {
             self.advance()?;
-            let ty = self.parse_type_path()?;
-            let span = left.span.merge(ty.span);
+            let pattern = self.parse_is_pattern()?;
+            let span = left.span.merge(pattern.span);
             left = Expr::new(
                 ExprKind::Is {
                     expr: Box::new(left),
-                    ty,
+                    pattern: Box::new(pattern),
                 },
                 span,
             );
@@ -1688,8 +1688,59 @@ impl<'src> Parser<'src> {
         Ok(left)
     }
 
+    /// Parse a pattern for `is` expressions.
+    /// Similar to parse_primary_pattern but treats simple identifiers as variants.
+    fn parse_is_pattern(&mut self) -> ParseResult<Pattern> {
+        match self.peek() {
+            // Built-in variant keywords
+            Some(Token::Ok | Token::Err | Token::Some | Token::None) => {
+                self.parse_variant_pattern()
+            }
+            // Identifiers are treated as variant names (not bindings)
+            Some(Token::Ident(_)) => {
+                let path = self.parse_path()?;
+
+                if self.check(&Token::LParen) {
+                    // Variant with args: Err(NotFound)
+                    self.advance()?;
+                    let patterns =
+                        self.parse_comma_separated(Self::parse_pattern, &Token::RParen)?;
+                    let end = self.expect(&Token::RParen)?;
+                    let span = path.span.merge(end);
+                    Ok(Pattern {
+                        kind: PatternKind::Variant { path, patterns },
+                        span,
+                    })
+                } else {
+                    // Variant without args: MyVariant
+                    let span = path.span;
+                    Ok(Pattern {
+                        kind: PatternKind::Variant {
+                            path,
+                            patterns: Vec::new(),
+                        },
+                        span,
+                    })
+                }
+            }
+            Some(token) => {
+                let token = token.clone();
+                let span = self.current_span();
+                Err(ParseError::ExpectedPattern {
+                    found: token.to_string(),
+                    span,
+                })
+            }
+            None => Err(ParseError::unexpected_eof("pattern", self.eof_span())),
+        }
+    }
+
+    // NOTE: parse_type_path is no longer used after the is-expression refactoring.
+    // Keeping it for now in case it's needed elsewhere.
+
     /// Parse a path that can be used as a type in `is` checks.
     /// Handles special variant tokens like Ok, Err, Some, None.
+    #[allow(dead_code)]
     fn parse_type_path(&mut self) -> ParseResult<Path> {
         match self.peek() {
             Some(Token::Ok) => {
@@ -3148,6 +3199,87 @@ mod tests {
                         Ok(n) => n > 0,
                         Err(_) => true
                     }
+                }
+            }
+            "#,
+        )
+        .unwrap();
+        assert!(!spec.states[0].invariants.is_empty());
+    }
+
+    #[test]
+    fn test_parse_is_expression_simple() {
+        // Test simple is expressions: result is Ok, result is Err
+        let spec = parse(
+            r#"
+            state Test {
+                result: Result<Int, String>,
+
+                invariant "is expression" {
+                    result is Ok
+                }
+            }
+            "#,
+        )
+        .unwrap();
+        assert!(!spec.states[0].invariants.is_empty());
+    }
+
+    #[test]
+    fn test_parse_is_expression_with_variant_pattern() {
+        // Test is expressions with variant patterns: result is Err(NotFound)
+        let spec = parse(
+            r#"
+            enum ErrorKind { NotFound, Forbidden, BadRequest }
+
+            state Test {
+                result: Result<Int, ErrorKind>,
+
+                invariant "is with variant" {
+                    result is Err(NotFound)
+                }
+            }
+            "#,
+        )
+        .unwrap();
+        assert!(!spec.states[0].invariants.is_empty());
+
+        // Check that the pattern was parsed correctly
+        let inv = &spec.states[0].invariants[0];
+        match &inv.expr.kind {
+            crate::ast::ExprKind::Is { expr: _, pattern } => {
+                match &pattern.kind {
+                    crate::ast::PatternKind::Variant { path, patterns } => {
+                        assert_eq!(path.segments.len(), 1);
+                        assert_eq!(path.segments[0].as_str(), "Err");
+                        assert_eq!(patterns.len(), 1);
+                        // Inner pattern should be a variant pattern for NotFound
+                        match &patterns[0].kind {
+                            crate::ast::PatternKind::Binding(ident) => {
+                                assert_eq!(ident.as_str(), "NotFound");
+                            }
+                            other => panic!("Expected Binding pattern, got {other:?}"),
+                        }
+                    }
+                    other => panic!("Expected Variant pattern, got {other:?}"),
+                }
+            }
+            other => panic!("Expected Is expression, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_is_expression_custom_variant() {
+        // Test is expressions with custom enum variants
+        let spec = parse(
+            r#"
+            enum Status { Active, Inactive, Pending(String) }
+
+            state Test {
+                status: Status,
+
+                invariant "status check" {
+                    status is Active or status is Pending(reason)
                 }
             }
             "#,

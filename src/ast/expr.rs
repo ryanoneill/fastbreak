@@ -171,12 +171,12 @@ pub enum ExprKind {
         body: Box<Expr>,
     },
 
-    /// Type check: `x is Ok`
+    /// Pattern check: `x is Ok` or `x is Err(NotFound)`
     Is {
         /// Expression to check
         expr: Box<Expr>,
-        /// Type or variant to check against
-        ty: Path,
+        /// Pattern to match against
+        pattern: Box<Pattern>,
     },
 
     /// Block expression: `{ stmt1; stmt2; expr }`
