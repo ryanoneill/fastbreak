@@ -194,6 +194,33 @@ enum ExpressionKind {
     Call,
     FieldAccess,
     Quantifier,
+    Match,
+    Block,
+}
+
+type MatchArm {
+    pattern: Pattern,
+    guard: Option<Expression>,
+    body: Expression,
+    span: Span,
+}
+
+type Pattern {
+    kind: PatternKind,
+    span: Span,
+}
+
+enum PatternKind {
+    Wildcard,
+    Literal,
+    Identifier,
+    Variant,
+    Struct,
+}
+
+type BlockExpression {
+    statements: List<Expression>,
+    span: Span,
 }
 
 // ============================================================================
@@ -446,6 +473,18 @@ action format_error(error: CompilerError) -> String
             None => true,
         }
     }
+
+scenario "Parse match with block body" {
+    given {
+        source = "state Test { x: Int, invariant { match x { 0 => { false }, _ => { x > 0 } } } }"
+    }
+    when {
+        result = parse(source)
+    }
+    then {
+        result is Ok
+    }
+}
 
 scenario "Parse error includes line number" {
     given {

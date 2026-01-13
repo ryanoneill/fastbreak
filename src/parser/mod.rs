@@ -34,6 +34,10 @@ pub struct Parser<'src> {
     pos: usize,
     /// Source code (for error reporting)
     source: &'src str,
+    /// Whether struct literals are allowed in the current expression context.
+    /// This is set to false when parsing match scrutinees to avoid ambiguity
+    /// with match arms (e.g., `match x { ... }` where `{ ... }` is the match body).
+    allow_struct_literal: bool,
 }
 
 impl<'src> Parser<'src> {
@@ -56,6 +60,7 @@ impl<'src> Parser<'src> {
             tokens,
             pos: 0,
             source,
+            allow_struct_literal: true,
         })
     }
 
@@ -1651,8 +1656,8 @@ impl<'src> Parser<'src> {
             Some(Token::Ident(_)) => {
                 let path = self.parse_path()?;
 
-                // Check for struct literal
-                if self.check(&Token::LBrace) {
+                // Check for struct literal (only if allowed in this context)
+                if self.allow_struct_literal && self.check(&Token::LBrace) {
                     self.parse_struct_literal(path)
                 } else {
                     let span = path.span;
@@ -1862,7 +1867,15 @@ impl<'src> Parser<'src> {
 
     fn parse_match_expr(&mut self) -> ParseResult<Expr> {
         let start = self.expect(&Token::Match)?;
+
+        // Disable struct literals when parsing the scrutinee to avoid ambiguity
+        // with the match body. E.g., `match x { ... }` should parse `x` as the
+        // scrutinee, not `x { ... }` as a struct literal.
+        let saved_allow_struct_literal = self.allow_struct_literal;
+        self.allow_struct_literal = false;
         let scrutinee = self.parse_expr()?;
+        self.allow_struct_literal = saved_allow_struct_literal;
+
         self.expect(&Token::LBrace)?;
 
         let mut arms = Vec::new();
@@ -1894,7 +1907,13 @@ impl<'src> Parser<'src> {
         };
 
         self.expect(&Token::FatArrow)?;
-        let body = self.parse_expr()?;
+
+        // Check for block body: `=> { ... }`
+        let body = if self.check(&Token::LBrace) {
+            self.parse_block_expr()?
+        } else {
+            self.parse_expr()?
+        };
         let span = pattern.span.merge(body.span);
 
         Ok(MatchArm {
@@ -1903,6 +1922,36 @@ impl<'src> Parser<'src> {
             body,
             span,
         })
+    }
+
+    fn parse_block_expr(&mut self) -> ParseResult<Expr> {
+        let start = self.expect(&Token::LBrace)?;
+
+        let mut exprs = Vec::new();
+
+        while !self.check(&Token::RBrace) {
+            let expr = self.parse_expr()?;
+            exprs.push(expr);
+
+            // Consume optional semicolon between expressions
+            if self.check(&Token::Semicolon) {
+                self.advance()?;
+            } else if !self.check(&Token::RBrace) {
+                // If no semicolon and not at end, it's an error
+                break;
+            }
+        }
+
+        let end = self.expect(&Token::RBrace)?;
+
+        // If only one expression, return it directly (unwrap single-element block)
+        if exprs.len() == 1 {
+            let mut expr = exprs.pop().unwrap();
+            expr.span = start.merge(end);
+            Ok(expr)
+        } else {
+            Ok(Expr::new(ExprKind::Block(exprs), start.merge(end)))
+        }
     }
 
     fn parse_pattern(&mut self) -> ParseResult<Pattern> {
@@ -2167,7 +2216,9 @@ impl<'src> Parser<'src> {
         };
 
         self.expect(&Token::Eq)?;
-        let value = self.parse_expr()?;
+        // Parse value with restricted precedence to stop before `in` keyword
+        // (since `in` is both a binary operator and let-expression keyword)
+        let value = self.parse_additive_expr()?;
         self.expect(&Token::In)?;
         let body = self.parse_expr()?;
         let span = start.merge(body.span);
@@ -2789,6 +2840,52 @@ mod tests {
                     match result {
                         Ok(n) => n > 0,
                         Err(_) => true
+                    }
+                }
+            }
+            "#,
+        )
+        .unwrap();
+        assert!(!spec.states[0].invariants.is_empty());
+    }
+
+    #[test]
+    fn test_parse_match_with_block() {
+        let spec = parse(
+            r#"
+            state Test {
+                result: Result<Int, String>,
+
+                invariant "match with block" {
+                    match result {
+                        Ok(n) => {
+                            let doubled = n * 2 in doubled > 0
+                        },
+                        Err(_) => { true }
+                    }
+                }
+            }
+            "#,
+        )
+        .unwrap();
+        assert!(!spec.states[0].invariants.is_empty());
+    }
+
+    #[test]
+    fn test_parse_match_with_multiline_block() {
+        let spec = parse(
+            r#"
+            state Test {
+                x: Int,
+
+                invariant "match with multi-expression block" {
+                    match x {
+                        0 => { false },
+                        1 => { true },
+                        _ => {
+                            x > 0;
+                            x < 100
+                        }
                     }
                 }
             }

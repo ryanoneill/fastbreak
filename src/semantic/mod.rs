@@ -1526,8 +1526,8 @@ impl Analyzer {
 
         // Check structural compatibility with nested Unknown handling
         match (a, b) {
-            (Type::List(a_elem), Type::List(b_elem)) => Self::types_compatible(a_elem, b_elem),
-            (Type::Set(a_elem), Type::Set(b_elem)) => Self::types_compatible(a_elem, b_elem),
+            (Type::List(a_elem), Type::List(b_elem))
+            | (Type::Set(a_elem), Type::Set(b_elem)) => Self::types_compatible(a_elem, b_elem),
             (Type::Option(a_inner), Type::Option(b_inner)) => {
                 Self::types_compatible(a_inner, b_inner)
             }
