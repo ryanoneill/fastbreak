@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-01-13
+
+### Added
+
+- **Enhanced quality requirements**: Quality blocks now support structured fields for comprehensive NFR specifications:
+  ```fbrk
+  quality performance "API response time" {
+      metric: latency,
+      scale: p99,
+      target: < 100ms,
+      constraint: hard,
+      applies_to: action register,
+      measurement: per_request,
+      under_load: {
+          concurrent_users: 1000,
+          requests_per_second: 500,
+      },
+      verified_by: [
+          test "load_test_api",
+          monitor "datadog_latency",
+      ],
+  }
+  ```
+  New fields: `scale` (p50, p90, p95, p99, p999, mean, median, max, min), `constraint` (hard/soft), `applies_to` (action/state/type), `measurement` (per_request, hourly, daily, etc.), `under_load` (structured load conditions), `verified_by` (list of verification methods).
+
+- **Variant pattern matching in `is` expressions**: The `is` operator now supports full pattern matching with nested variants:
+  ```fbrk
+  result is Err(NotFound)
+  status is Pending(reason)
+  ```
+  Previously only simple variant names were supported (e.g., `result is Ok`).
+
+- **Dotted paths in use statements**: Import statements now support dotted module paths to match module declarations:
+  ```fbrk
+  module abc.catalog
+  // ...
+
+  // In another file:
+  use abc.catalog::{Item, Category}
+  ```
+
 ## [0.2.0] - 2026-01-12
 
 ### Added
@@ -27,13 +68,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Multi-file module imports**: Specifications can now be split across multiple files with import support:
   ```fbrk
   // In types.fbrk
-  module types
+  module myproject.types
   type UserId { value: Int }
   type Email { address: String }
 
   // In users.fbrk
-  module users
-  use types::{UserId, Email}
+  module myproject.users
+  use myproject.types::{UserId, Email}
   type User { id: UserId, email: Email }
   ```
 
