@@ -412,6 +412,30 @@ impl Analyzer {
             action.name.span,
         ));
 
+        // Make state fields accessible in action contracts
+        // Collect state fields first to avoid borrow checker issues
+        let state_fields: Vec<_> = self
+            .types
+            .states()
+            .flat_map(|state| {
+                state
+                    .fields
+                    .iter()
+                    .map(|(field_name, field_type)| (field_name.clone(), field_type.clone()))
+            })
+            .collect();
+
+        for (field_name, field_type) in state_fields {
+            // Only define if not already defined (parameters take precedence)
+            if !self.symbols.is_defined_locally(&field_name) {
+                self.symbols.define(Symbol::new(
+                    field_name,
+                    SymbolKind::Field(field_type),
+                    action.name.span,
+                ));
+            }
+        }
+
         // Check contracts
         for contract in &action.contracts {
             let contract_type = self.check_expr(&contract.expr);
@@ -1631,6 +1655,93 @@ mod tests {
         );
         assert!(analyzer.succeeded());
         assert!(analyzer.types.get_action("greet").is_some());
+    }
+
+    #[test]
+    fn test_analyze_action_with_state_field_access() {
+        // State fields should be accessible in action contracts (requires/ensures)
+        let analyzer = analyze_source(
+            r#"
+            state Counter {
+                count: Int,
+                max_count: Int,
+            }
+
+            action increment(amount: Int) -> Int
+                requires {
+                    count >= 0 and amount > 0
+                }
+                ensures {
+                    count' == count + amount and result == count'
+                }
+
+            action reset()
+                requires {
+                    count > 0
+                }
+                ensures {
+                    count' == 0
+                }
+            "#,
+        );
+        assert!(
+            analyzer.succeeded(),
+            "State fields should be accessible in action contracts: {:?}",
+            analyzer.errors()
+        );
+        assert!(analyzer.types.get_action("increment").is_some());
+        assert!(analyzer.types.get_action("reset").is_some());
+    }
+
+    #[test]
+    fn test_analyze_action_with_multiple_states() {
+        // State fields from all states should be accessible in action contracts
+        let analyzer = analyze_source(
+            r#"
+            state Users {
+                user_count: Int,
+            }
+
+            state Sessions {
+                session_count: Int,
+            }
+
+            action login(user: String)
+                requires {
+                    user_count >= 0
+                }
+                ensures {
+                    user_count' == user_count + 1 and session_count' == session_count + 1
+                }
+            "#,
+        );
+        assert!(
+            analyzer.succeeded(),
+            "Fields from multiple states should be accessible in contracts: {:?}",
+            analyzer.errors()
+        );
+    }
+
+    #[test]
+    fn test_analyze_action_param_shadows_state_field() {
+        // Action parameters should take precedence over state fields with same name
+        let analyzer = analyze_source(
+            r#"
+            state Counter {
+                count: Int,
+            }
+
+            action set_count(count: Int)
+                ensures {
+                    count' == count
+                }
+            "#,
+        );
+        assert!(
+            analyzer.succeeded(),
+            "Action param 'count' should shadow state field 'count': {:?}",
+            analyzer.errors()
+        );
     }
 
     #[test]

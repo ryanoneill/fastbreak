@@ -339,4 +339,9 @@ impl TypeRegistry {
     pub fn enums(&self) -> impl Iterator<Item = &EnumInfo> {
         self.enums.values()
     }
+
+    /// Iterate over all states
+    pub fn states(&self) -> impl Iterator<Item = &StateInfo> {
+        self.states.values()
+    }
 }

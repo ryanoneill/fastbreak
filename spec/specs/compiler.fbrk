@@ -75,6 +75,29 @@ action resolve_imports(registry: ModuleRegistry, module_name: String) -> List<St
         result.len() >= 0
     }
 
+// Action contracts can reference state fields from the enclosing state.
+// In requires clauses: state fields represent the current state
+// In ensures clauses: state fields represent current state, state' represents next state
+action load_source(path: String) -> Result<String, String>
+    requires {
+        // State field access in requires - references current state
+        not path in source_files
+    }
+    ensures {
+        match result {
+            Ok(content) => path in source_files' and errors' == errors,
+            Err(msg) => source_files' == source_files,
+        }
+    }
+
+action clear_errors() -> Int
+    requires {
+        errors.len() > 0
+    }
+    ensures {
+        result == old(errors.len()) and errors'.len() == 0
+    }
+
 // ============================================================================
 // Supporting Types for Actions
 // ============================================================================
@@ -352,6 +375,21 @@ scenario "Parse scenario with trailing commas in bindings" {
     then {
         // Parser should accept trailing commas in given/when/then bindings
         result is Ok
+    }
+}
+
+scenario "Analyze action contracts with state field access" {
+    given {
+        // State fields should be accessible in action contracts
+        source = "state Counter { count: Int } action increment(n: Int) requires { count >= 0 } ensures { count' == count + n }"
+    }
+    when {
+        spec = parse(source)
+        errors = analyze(spec.unwrap())
+    }
+    then {
+        // State fields (count) should be resolvable in requires/ensures
+        errors.len() == 0
     }
 }
 
