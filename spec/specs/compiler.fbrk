@@ -340,6 +340,21 @@ scenario "Parse error includes line number" {
     }
 }
 
+scenario "Parse scenario with trailing commas in bindings" {
+    given {
+        // Scenario bindings support optional trailing commas after values
+        // e.g., status = Status.Active, (comma is optional but allowed)
+        source = "scenario with trailing commas"
+    }
+    when {
+        result = parse(source)
+    }
+    then {
+        // Parser should accept trailing commas in given/when/then bindings
+        result is Ok
+    }
+}
+
 property "All errors with spans have valid line numbers" {
     always {
         forall error: CompilerError where error.context is Some =>

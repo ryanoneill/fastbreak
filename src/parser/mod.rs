@@ -855,6 +855,10 @@ impl<'src> Parser<'src> {
         let mut bindings = Vec::new();
         while !self.check(&Token::RBrace) {
             bindings.push(self.parse_binding()?);
+            // Consume optional trailing comma
+            if self.check(&Token::Comma) {
+                self.advance()?;
+            }
         }
 
         let end = self.expect(&Token::RBrace)?;
@@ -872,6 +876,10 @@ impl<'src> Parser<'src> {
         let mut bindings = Vec::new();
         while !self.check(&Token::RBrace) {
             bindings.push(self.parse_binding()?);
+            // Consume optional trailing comma
+            if self.check(&Token::Comma) {
+                self.advance()?;
+            }
         }
 
         let end = self.expect(&Token::RBrace)?;
@@ -889,6 +897,10 @@ impl<'src> Parser<'src> {
         let mut assertions = Vec::new();
         while !self.check(&Token::RBrace) {
             assertions.push(self.parse_assertion()?);
+            // Consume optional trailing comma
+            if self.check(&Token::Comma) {
+                self.advance()?;
+            }
         }
 
         let end = self.expect(&Token::RBrace)?;
@@ -3009,6 +3021,51 @@ mod tests {
         assert_eq!(spec.actions.len(), 1);
         assert_eq!(spec.actions[0].name.as_str(), "register");
         assert_eq!(spec.actions[0].contracts.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_binding_with_trailing_comma() {
+        // Test that bindings with trailing commas parse correctly
+        let spec = parse(
+            r#"
+            scenario "test" {
+                given {
+                    x = 1,
+                    y = 2,
+                }
+                when {
+                    z = 3,
+                }
+                then {
+                    x == 1,
+                }
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.scenarios.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_binding_with_field_access_and_comma() {
+        // Test bindings with field access and trailing commas
+        let spec = parse(
+            r#"
+            scenario "test" {
+                given {
+                    status = Status.Active,
+                }
+                when {
+                    msg = "test",
+                }
+                then {
+                    status is Ok,
+                }
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.scenarios.len(), 1);
     }
 
     #[test]
