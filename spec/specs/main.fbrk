@@ -404,10 +404,11 @@ type IntLiteral {
 }
 
 // Note: FloatLiteral uses f64 internally in the implementation
-// Float is not yet a first-class built-in type in the language
+// Float is not yet a built-in type reference (cannot write x: Float)
+// but Float literals create Type::Float in semantic analysis
 type FloatLiteral {
-    // Represented as f64 in the AST (e.g., 3.14, 99.99)
-    value: Int,  // Placeholder: actual implementation uses f64
+    // Rust: f64 - Float is not a BuiltInType, only a semantic Type
+    value: Int,
 }
 
 type StringLiteral {
@@ -708,16 +709,12 @@ type QualityProperty {
 }
 
 enum QualityPropertyValue {
-    // String value
-    StringVal,
-    // Integer value
-    IntVal,
-    // Boolean value
-    BoolVal,
-    // Identifier reference
-    IdentVal,
-    // Expression value
-    ExprVal,
+    // Identifier value (e.g., scale: p95) - carries Ident
+    Ident,
+    // Target value (e.g., constraint: < 500ms) - carries QualityTarget
+    Target,
+    // Applies to reference (e.g., applies_to: action create_user) - carries AppliesTo
+    AppliesTo,
 }
 
 type Specification {
