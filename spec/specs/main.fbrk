@@ -131,7 +131,7 @@ type TypeAlias {
     attributes: List<Attribute>,
     name: Ident,
     type_params: List<Ident>,
-    target: TypeRef,
+    base: TypeRef,
     refinement: Option<Expression>,
     span: Span,
 }
