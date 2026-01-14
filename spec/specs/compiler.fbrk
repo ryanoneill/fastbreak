@@ -414,6 +414,21 @@ scenario "Analyze action contracts with state field access" {
     }
 }
 
+scenario "Analyze action calls in invariants" {
+    given {
+        // Actions can be called in invariant expressions as helper/predicate functions
+        source = "action is_valid(s: String) -> Bool\n\nstate Registry { paths: Set<String>, invariant { forall p in paths => is_valid(p) } }"
+    }
+    when {
+        spec = parse(source)
+        errors = analyze(spec.unwrap())
+    }
+    then {
+        // Action calls in invariants should resolve successfully
+        errors.len() == 0
+    }
+}
+
 property "All errors with spans have valid line numbers" {
     always {
         forall error: CompilerError where error.context is Some =>

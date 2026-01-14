@@ -164,6 +164,11 @@ type StateField {
     span: Span,
 }
 
+// State invariant - a boolean expression that must always hold.
+// Invariant expressions can reference:
+// - State fields defined in the enclosing state
+// - Actions defined in the same specification (for helper/predicate functions)
+// - Global types and enums
 type Invariant {
     attributes: List<Attribute>,
     description: Option<String>,

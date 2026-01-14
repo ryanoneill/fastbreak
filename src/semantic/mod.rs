@@ -272,15 +272,38 @@ impl Analyzer {
             self.resolve_relation(relation);
         }
 
-        // Resolve states
+        // Pre-register action names so they're visible in invariants
+        // (Full action resolution happens after states)
+        for action in &spec.actions {
+            self.pre_register_action(action);
+        }
+
+        // Resolve states (invariants can now reference actions)
         for state in &spec.states {
             self.resolve_state(state);
         }
 
-        // Resolve actions
+        // Fully resolve actions (parameters, contracts, etc.)
         for action in &spec.actions {
             self.resolve_action(action);
         }
+    }
+
+    /// Pre-register an action's name and return type in the global scope.
+    /// This allows invariants to call actions as helper/predicate functions.
+    fn pre_register_action(&mut self, action: &Action) {
+        let name = &action.name.name;
+
+        // Skip if already defined (will be caught as duplicate in resolve_action)
+        if self.symbols.is_defined_locally(name) {
+            return;
+        }
+
+        self.symbols.define(Symbol::new(
+            name.clone(),
+            SymbolKind::Action(name.clone()),
+            action.name.span,
+        ));
     }
 
     fn resolve_relation(&mut self, relation: &Relation) {
@@ -365,8 +388,10 @@ impl Analyzer {
     fn resolve_action(&mut self, action: &Action) {
         let name = &action.name.name;
 
-        if self.symbols.is_defined_locally(name) {
-            if let Some(existing) = self.symbols.lookup(name) {
+        // Check for duplicates (but not our own pre-registration)
+        if let Some(existing) = self.symbols.lookup(name) {
+            // If the existing symbol has a different span, it's a real duplicate
+            if existing.span != action.name.span {
                 self.diagnostics.error(SemanticError::duplicate(
                     "action",
                     name.as_str(),
@@ -382,11 +407,7 @@ impl Analyzer {
             .as_ref()
             .map_or(Type::Unit, |t| self.resolve_type(t));
 
-        self.symbols.define(Symbol::new(
-            name.clone(),
-            SymbolKind::Action(name.clone()),
-            action.name.span,
-        ));
+        // Symbol already defined in pre_register_action, no need to redefine
 
         let mut action_info = ActionInfo::new(name.clone(), return_type.clone());
 
@@ -1752,6 +1773,24 @@ mod tests {
             state Test {
                 x: Int,
                 invariant "positive" { x > 0 }
+            }
+            "#,
+        );
+        assert!(analyzer.succeeded());
+    }
+
+    #[test]
+    fn test_analyze_invariant_with_action_call() {
+        // Actions should be callable from invariant expressions
+        let analyzer = analyze_source(
+            r#"
+            action is_valid(s: String) -> Bool
+
+            state Registry {
+                paths: Set<String>,
+                invariant "all paths valid" {
+                    forall p in paths => is_valid(p)
+                }
             }
             "#,
         );
