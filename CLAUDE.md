@@ -11,10 +11,23 @@ When verifying that the fastbreak specification matches the code implementation:
 - **Follow the exhaustive verification procedure in [`docs/spec-verification.md`](docs/spec-verification.md)**
 - Verification must be field-by-field and variant-by-variant - partial verification creates false confidence
 
+## Spec-First TDD Workflow
+
+When implementing new features, follow the **spec-first TDD workflow** documented in [`docs/spec-first-workflow.md`](docs/spec-first-workflow.md):
+
+1. **Spec First** - Update `spec/specs/*.fbrk` before writing any code
+2. **Validate** - Run `cargo run -- check spec/specs/`
+3. **Test First** - Write a failing test (TDD Red)
+4. **Implement** - Minimum code to pass (TDD Green)
+5. **Verify** - Run `/verify-spec` to ensure alignment
+6. **Commit** - With signed commit
+
+Use `/implement-feature` command for guided implementation.
+
 ## Testing
 
 - Use Test-Driven Development (TDD) when adding new features
-- All 154+ tests must pass before committing changes
+- All 155+ tests must pass before committing changes
 - Run `cargo test --quiet` to verify
 
 ## Specification Files
