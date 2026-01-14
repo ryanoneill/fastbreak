@@ -552,6 +552,7 @@ type ModuleInfo {
     enums: Set<String>,
     states: Set<String>,
     actions: Set<String>,
+    relations: Set<String>,
     imports: List<ResolvedImport>,
 }
 

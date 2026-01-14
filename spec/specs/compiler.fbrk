@@ -488,11 +488,13 @@ enum Token {
     Antisymmetric,  // antisymmetric
 
     // ========== Type keywords ==========
-    IsKw,           // is
-    OkKw,           // Ok
-    ErrKw,          // Err
-    SomeKw,         // Some
-    NoneKw,         // None
+    // Note: Rust code uses Is, Ok, Err, Some, None but these are reserved
+    // keywords in fastbreak, so we use the Kw suffix here
+    IsKw,           // is (Rust: Is)
+    OkKw,           // Ok (Rust: Ok)
+    ErrKw,          // Err (Rust: Err)
+    SomeKw,         // Some (Rust: Some)
+    NoneKw,         // None (Rust: None)
 
     // ========== Punctuation ==========
     LBrace,         // {
