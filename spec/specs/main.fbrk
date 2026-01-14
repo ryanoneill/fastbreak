@@ -6,8 +6,10 @@ module fastbreak
 // Core Types
 // ============================================================================
 
-type Identifier {
+// An identifier with source location
+type Ident {
     name: String,
+    span: Span,
 }
 
 type Span {
@@ -28,7 +30,7 @@ enum PrimitiveType {
 
 // Attribute on definitions: @id("REQ-001"), @deprecated, @since("1.0")
 type Attribute {
-    name: Identifier,
+    name: Ident,
     args: List<AttributeArg>,
     span: Span,
 }
@@ -48,7 +50,7 @@ type StringAttributeArg {
 }
 
 type IdentAttributeArg {
-    value: Identifier,
+    value: Ident,
 }
 
 type IntAttributeArg {
@@ -97,31 +99,38 @@ type GenericArg {
 }
 
 type Field {
-    name: Identifier,
-    field_type: TypeRef,
+    name: Ident,
+    ty: TypeRef,
+    span: Span,
+}
+
+type TypeDef {
+    attributes: List<Attribute>,
+    name: Ident,
+    type_params: List<Ident>,
+    fields: List<Field>,
     refinement: Option<Expression>,
     span: Span,
 }
 
-type TypeDefinition {
-    name: Identifier,
+type EnumVariant {
+    name: Ident,
     fields: List<Field>,
     span: Span,
 }
 
-type EnumVariant {
-    name: Identifier,
-    span: Span,
-}
-
-type EnumDefinition {
-    name: Identifier,
+type EnumDef {
+    attributes: List<Attribute>,
+    name: Ident,
+    type_params: List<Ident>,
     variants: List<EnumVariant>,
     span: Span,
 }
 
 type TypeAlias {
-    name: Identifier,
+    attributes: List<Attribute>,
+    name: Ident,
+    type_params: List<Ident>,
     target: TypeRef,
     refinement: Option<Expression>,
     span: Span,
@@ -134,7 +143,7 @@ type TypeAlias {
 // Relation definition: relation friends: User -> Set<User> { symmetric }
 type Relation {
     attributes: List<Attribute>,
-    name: Identifier,
+    name: Ident,
     source: TypeRef,
     target: TypeRef,
     constraints: List<RelationConstraint>,
@@ -160,28 +169,30 @@ enum RelationConstraint {
 // ============================================================================
 
 type StateField {
-    name: Identifier,
-    field_type: TypeRef,
-    initial_value: Option<Expression>,
+    name: Ident,
+    ty: TypeRef,
+    init: Option<Expression>,
     span: Span,
 }
 
 type Invariant {
+    attributes: List<Attribute>,
     description: Option<String>,
-    expression: Expression,
+    expr: Expression,
     span: Span,
 }
 
-type StateDefinition {
-    name: Identifier,
+type StateBlock {
+    attributes: List<Attribute>,
+    name: Ident,
     fields: List<StateField>,
     invariants: List<Invariant>,
     span: Span,
 }
 
-type Parameter {
-    name: Identifier,
-    param_type: TypeRef,
+type ActionParam {
+    name: Ident,
+    ty: TypeRef,
     span: Span,
 }
 
@@ -192,15 +203,17 @@ enum ContractKind {
 
 type Contract {
     kind: ContractKind,
-    expression: Expression,
+    expr: Expression,
     span: Span,
 }
 
-type ActionDefinition {
-    name: Identifier,
-    parameters: List<Parameter>,
+type Action {
+    attributes: List<Attribute>,
+    name: Ident,
+    params: List<ActionParam>,
     return_type: Option<TypeRef>,
     contracts: List<Contract>,
+    body: Option<Expression>,
     span: Span,
 }
 
@@ -209,13 +222,13 @@ type ActionDefinition {
 // ============================================================================
 
 type Binding {
-    name: Identifier,
+    name: Ident,
     value: Expression,
     span: Span,
 }
 
 type Assertion {
-    expression: Expression,
+    expr: Expression,
     description: Option<String>,
     span: Span,
 }
@@ -236,19 +249,21 @@ type ThenClause {
 }
 
 type Alternative {
+    attributes: List<Attribute>,
     name: String,
     condition: Option<Expression>,
     given: Option<GivenClause>,
     when: Option<WhenClause>,
-    then_clause: ThenClause,
+    then: ThenClause,
     span: Span,
 }
 
 type Scenario {
+    attributes: List<Attribute>,
     description: String,
     given: GivenClause,
-    when_clause: WhenClause,
-    then_clause: ThenClause,
+    when: WhenClause,
+    then: ThenClause,
     alternatives: List<Alternative>,
     span: Span,
 }
@@ -257,15 +272,16 @@ type Scenario {
 // Properties
 // ============================================================================
 
-enum TemporalOperator {
+enum TemporalOp {
     Always,
     Eventually,
 }
 
 type Property {
+    attributes: List<Attribute>,
     description: String,
-    temporal_op: Option<TemporalOperator>,
-    expression: Expression,
+    temporal_op: Option<TemporalOp>,
+    expr: Expression,
     span: Span,
 }
 
@@ -411,7 +427,7 @@ enum QuantifierKind {
 }
 
 type QuantBinding {
-    name: Identifier,
+    name: Ident,
     kind: QuantBindingKind,
     span: Span,
 }
@@ -428,12 +444,12 @@ enum QuantBindingKind {
 // ============================================================================
 
 type LambdaParam {
-    name: Identifier,
+    name: Ident,
     param_type: Option<TypeRef>,
 }
 
 type FieldInit {
-    name: Identifier,
+    name: Ident,
     value: Expression,
     span: Span,
 }
@@ -472,7 +488,7 @@ enum PatternKind {
 }
 
 type FieldPattern {
-    name: Identifier,
+    name: Ident,
     pattern: Option<Pattern>,
     span: Span,
 }
@@ -486,29 +502,28 @@ type BlockExpression {
 // Specification (top-level)
 // ============================================================================
 
-// Module path for dotted names like "abc.def.ghi"
-type ModulePath {
-    segments: List<Identifier>,
+// A qualified path like "common::types::Email" or "abc.def.ghi"
+type Path {
+    segments: List<Ident>,
     span: Span,
 }
 
 type Module {
-    // Module name supports dotted paths (e.g., "abc.def")
-    name: ModulePath,
+    // Module path supports dotted paths (e.g., "abc.def")
+    path: Path,
     span: Span,
 }
 
 // Import statement: use path::to::module::{Item, AnotherItem as Alias}
 type Import {
-    path: ModulePath,
+    path: Path,
     items: Option<List<ImportItem>>,
     span: Span,
 }
 
 type ImportItem {
-    name: Identifier,
-    alias: Option<Identifier>,
-    span: Span,
+    name: Ident,
+    alias: Option<Ident>,
 }
 
 // Resolved import after cross-module resolution
@@ -540,12 +555,12 @@ type ModuleInfo {
 type Specification {
     module: Option<Module>,
     imports: List<Import>,
-    types: List<TypeDefinition>,
-    enums: List<EnumDefinition>,
+    types: List<TypeDef>,
     type_aliases: List<TypeAlias>,
+    enums: List<EnumDef>,
     relations: List<Relation>,
-    states: List<StateDefinition>,
-    actions: List<ActionDefinition>,
+    states: List<StateBlock>,
+    actions: List<Action>,
     scenarios: List<Scenario>,
     properties: List<Property>,
     qualities: List<Quality>,

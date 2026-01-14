@@ -63,7 +63,7 @@ action build_module_registry(specs: List<Specification>) -> ModuleRegistry
     ensures {
         // All modules from input specs are registered
         forall spec in specs where spec.module is Some =>
-            result.modules.contains_key(spec.module.unwrap().name)
+            result.modules.contains_key(spec.module.unwrap().path)
     }
 
 action resolve_imports(registry: ModuleRegistry, module_name: String) -> List<String>
@@ -178,7 +178,7 @@ scenario "Parse dotted module name" {
     then {
         result is Ok
         result.unwrap().module is Some
-        result.unwrap().module.unwrap().name.segments.len() == 3
+        result.unwrap().module.unwrap().path.segments.len() == 3
     }
 }
 
@@ -605,7 +605,7 @@ type Quality {
     attributes: List<Attribute>,
     category: QualityCategory,
     description: String,
-    metric: Identifier,
+    metric: Ident,
     scale: Option<Scale>,
     target: QualityTarget,
     constraint: Option<Constraint>,
@@ -687,7 +687,7 @@ enum VerificationKind {
 // Reference to what a quality applies to
 type AppliesTo {
     kind: AppliesToKind,
-    name: Identifier,
+    name: Ident,
     span: Span,
 }
 
@@ -765,7 +765,7 @@ enum RateUnit {
 
 // Additional properties in quality blocks
 type QualityProperty {
-    name: Identifier,
+    name: Ident,
     value: QualityPropertyValue,
     span: Span,
 }
