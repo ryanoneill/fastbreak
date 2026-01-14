@@ -386,12 +386,12 @@ enum Token {
     Eventually,     // eventually
     Forall,         // forall
     Exists,         // exists
-    InKw,           // in
-    WhereKw,        // where
-    MatchKw,        // match
-    IfKw,           // if
-    ElseKw,         // else
-    LetKw,          // let
+    In,             // in
+    Where,          // where
+    Match,          // match
+    If,             // if
+    Else,           // else
+    Let,            // let
     Fn,             // fn
     Return,         // return
     SelfKw,         // self
@@ -403,8 +403,8 @@ enum Token {
     Implies,        // implies
 
     // ========== Boolean literals ==========
-    TrueLit,        // true
-    FalseLit,       // false
+    True,           // true
+    False,          // false
 
     // ========== Relation constraints ==========
     Symmetric,      // symmetric
@@ -415,10 +415,10 @@ enum Token {
 
     // ========== Type keywords ==========
     IsKw,           // is
-    OkVariant,      // Ok
-    ErrVariant,     // Err
-    SomeVariant,    // Some
-    NoneVariant,    // None
+    OkKw,           // Ok
+    ErrKw,          // Err
+    SomeKw,         // Some
+    NoneKw,         // None
 
     // ========== Punctuation ==========
     LBrace,         // {
@@ -458,9 +458,9 @@ enum Token {
     Bang,           // !
 
     // ========== Literals ==========
-    Integer,        // 42, 0, 100
-    StringToken,    // "hello"
-    Ident,          // foo, User, _private
+    Integer,        // 42, 0, 100 (with i64 value)
+    String,         // "hello" (with SmolStr value)
+    Ident,          // foo, User, _private (with SmolStr value)
 }
 
 // Lexed token with position information
@@ -606,9 +606,96 @@ type Quality {
     category: QualityCategory,
     description: String,
     metric: Identifier,
+    scale: Option<Scale>,
     target: QualityTarget,
+    constraint: Option<Constraint>,
+    applies_to: Option<AppliesTo>,
+    measurement: Option<MeasurementPeriod>,
+    under_load: Option<LoadConditions>,
+    verified_by: List<VerificationMethod>,
     properties: List<QualityProperty>,
     span: Span,
+}
+
+// Statistical scale for measurements
+enum Scale {
+    Mean,
+    Median,
+    P50,
+    P90,
+    P95,
+    P99,
+    P999,
+    Max,
+    Min,
+}
+
+// Whether a quality target is a hard constraint or soft target
+enum Constraint {
+    Hard,
+    Soft,
+}
+
+// Measurement period for quality metrics
+enum MeasurementPeriod {
+    PerRequest,
+    PerSecond,
+    PerMinute,
+    Hourly,
+    Daily,
+    Weekly,
+    Monthly,
+}
+
+// Load conditions under which the quality is measured
+type LoadConditions {
+    concurrent_users: Option<Int>,
+    concurrent_connections: Option<Int>,
+    requests_per_second: Option<Int>,
+    payload_size: Option<SizeValue>,
+    duration: Option<DurationValue>,
+    span: Span,
+}
+
+// Size value with unit
+type SizeValue {
+    value: Int,
+    unit: SizeUnit,
+}
+
+// Duration value with unit
+type DurationValue {
+    value: Int,
+    unit: DurationUnit,
+}
+
+// Verification method for a quality requirement
+type VerificationMethod {
+    kind: VerificationKind,
+    name: String,
+    span: Span,
+}
+
+// Kind of verification method
+enum VerificationKind {
+    Test,
+    Monitor,
+    Benchmark,
+    Audit,
+}
+
+// Reference to what a quality applies to
+type AppliesTo {
+    kind: AppliesToKind,
+    name: Identifier,
+    span: Span,
+}
+
+// Kind of applies_to target
+enum AppliesToKind {
+    Action,
+    Type,
+    State,
 }
 
 // Categories of quality requirements

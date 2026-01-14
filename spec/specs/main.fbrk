@@ -282,16 +282,18 @@ type Expression {
 enum ExpressionKind {
     // Literals: integers, strings, booleans, unit
     Literal,
-    // Identifier reference
-    Ident,
+    // Variable or path reference: x, user.email
+    Var,
     // Binary operation: left op right
     Binary,
     // Unary operation: op expr
     Unary,
-    // Function/method call: f(args)
+    // Function call: f(args)
     Call,
+    // Method call with receiver: users.map(u => u.id)
+    MethodCall,
     // Field access: expr.field
-    FieldAccess,
+    Field,
     // Index access: expr[index]
     Index,
     // Match expression: match expr { arms }
@@ -303,29 +305,35 @@ enum ExpressionKind {
     // List literal: [a, b, c]
     List,
     // Set literal: {a, b, c}
-    SetLiteral,
+    Set,
     // Map literal: {k1: v1, k2: v2}
-    MapLiteral,
+    Map,
     // Struct literal: Type { field: value }
     Struct,
     // Tuple literal: (a, b, c)
     Tuple,
-    // Lambda: |params| body
+    // Lambda: |params| body or x => body
     Lambda,
-    // Let binding: let x = expr
+    // Let binding: let x = expr in body
     Let,
-    // Quantifier: forall/exists
-    Quantifier,
-    // Range: start..end or start..=end
+    // Universal quantifier: forall x in xs => pred(x)
+    Forall,
+    // Existential quantifier: exists x in xs => pred(x)
+    Exists,
+    // Implication: a implies b
+    Implies,
+    // Range: start..end
     Range,
-    // Type check: expr is Type
+    // Type/pattern check: expr is Type or expr is Ok(value)
     Is,
-    // Unwrap: expr.unwrap() or expr?
-    Unwrap,
     // Old value in postcondition: old(expr)
     Old,
     // Next state value: expr'
     Prime,
+    // Result value in postconditions
+    Result,
+    // Self reference in refinement predicates
+    SelfRef,
 }
 
 // ============================================================================
@@ -459,6 +467,8 @@ enum PatternKind {
     Struct,
     // Tuple pattern: (a, b, c)
     Tuple,
+    // Or pattern: A | B
+    Or,
 }
 
 type FieldPattern {
@@ -533,8 +543,10 @@ type Specification {
     types: List<TypeDefinition>,
     enums: List<EnumDefinition>,
     type_aliases: List<TypeAlias>,
+    relations: List<Relation>,
     states: List<StateDefinition>,
     actions: List<ActionDefinition>,
     scenarios: List<Scenario>,
     properties: List<Property>,
+    qualities: List<Quality>,
 }
