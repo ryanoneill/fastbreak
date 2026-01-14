@@ -662,9 +662,34 @@ type LoadConditions {
     concurrent_users: Option<Int>,
     concurrent_connections: Option<Int>,
     requests_per_second: Option<Int>,
+    // Note: Code uses Option<(i64, SizeUnit)> tuple
     payload_size: Option<Int>,
+    // Note: Code uses Option<(i64, DurationUnit)> tuple
     duration: Option<Int>,
     span: Span,
+}
+
+// Duration units for quality values
+enum DurationUnit {
+    Ms,     // milliseconds
+    S,      // seconds
+    M,      // minutes
+    H,      // hours
+}
+
+// Size units for quality values
+enum SizeUnit {
+    Kb,     // kilobytes
+    Mb,     // megabytes
+    Gb,     // gigabytes
+    Tb,     // terabytes
+}
+
+// Rate units for quality values
+enum RateUnit {
+    PerSecond,
+    PerMinute,
+    PerHour,
 }
 
 type VerificationMethod {
