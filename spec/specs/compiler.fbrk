@@ -521,9 +521,6 @@ enum Token {
     Float,          // 3.14, 99.99 (with f64 value)
     String,         // "hello" (with SmolStr value)
     Ident,          // foo, User, _private (with SmolStr value)
-
-    // ========== Percentage ==========
-    Percent,        // % (suffix for percentage values)
 }
 
 // Lexed token with position information
@@ -586,32 +583,30 @@ type ImportError {
     span: Span,
 }
 
-// Resolved type information
+// Resolved semantic type (maps to src/semantic/types.rs Type enum)
 enum ResolvedType {
     // Primitive types
     Int,
+    Float,
     String,
     Bool,
-    // Collection types
-    Set,
-    List,
-    Map,
-    Option,
-    Result,
-    // User-defined types
-    UserDefined,
-    // Enum type
-    Enum,
-    // Type alias
-    Alias,
-    // Function type
-    Function,
-    // Tuple type
-    Tuple,
-    // Unit type
     Unit,
-    // Unknown (for error recovery)
-    Unknown,
+    // User-defined types
+    Struct,         // Struct(TypeId)
+    Enum,           // Enum(TypeId)
+    // Collection types
+    Set,            // Set(Arc<Type>)
+    List,           // List(Arc<Type>)
+    Map,            // Map(Arc<Type>, Arc<Type>)
+    Option,         // Option(Arc<Type>)
+    Result,         // Result(Arc<Type>, Arc<Type>)
+    // Compound types
+    Tuple,          // Tuple(Vec<Type>)
+    Function,       // Function { params, ret }
+    // Type variables and inference
+    Var,            // Type variable for generics
+    Unknown,        // Used during type inference
+    Error,          // Used when type checking fails
 }
 
 // Type registry for semantic analysis

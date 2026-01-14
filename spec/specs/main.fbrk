@@ -35,26 +35,15 @@ type Attribute {
     span: Span,
 }
 
-// Argument to an attribute
+// Argument to an attribute (enum with associated data)
+// Rust: pub enum AttributeArg { String(SmolStr, Span), Ident(Ident), Int(i64, Span) }
 enum AttributeArg {
-    // String argument: @id("REQ-001")
-    StringArg,
-    // Identifier argument: @category(security)
-    IdentArg,
-    // Integer argument: @priority(1)
-    IntArg,
-}
-
-type StringAttributeArg {
-    value: String,
-}
-
-type IdentAttributeArg {
-    value: Ident,
-}
-
-type IntAttributeArg {
-    value: Int,
+    // String argument: @id("REQ-001") - carries (String, Span)
+    String,
+    // Identifier argument: @category(security) - carries Ident
+    Ident,
+    // Integer argument: @priority(1) - carries (Int, Span)
+    Int,
 }
 
 // ============================================================================
@@ -454,7 +443,7 @@ enum QuantBindingKind {
 
 type LambdaParam {
     name: Ident,
-    param_type: Option<TypeRef>,
+    ty: Option<TypeRef>,
 }
 
 type FieldInit {
@@ -621,18 +610,20 @@ enum QualityOp {
     Eq,
 }
 
+// Quality value with associated data
+// Rust: pub enum QualityValue { Int(i64), Percentage(f64), Duration(i64, DurationUnit), Size(i64, SizeUnit), Rate(i64, RateUnit), Expr(Expr) }
 enum QualityValue {
-    // Duration value: 100ms, 5s, 1m
-    Duration,
-    // Size value: 1KB, 10MB
-    Size,
-    // Rate value: 1000/s, 50/min
-    Rate,
-    // Percentage value: 99.9%
+    // Integer value: 1000 - carries Int
+    Int,
+    // Percentage value: 99.9% - carries Float
     Percentage,
-    // Integer value: 1000
-    Integer,
-    // Expression for computed values
+    // Duration value: 100ms, 5s - carries (Int, DurationUnit)
+    Duration,
+    // Size value: 1KB, 10MB - carries (Int, SizeUnit)
+    Size,
+    // Rate value: 1000/s, 50/min - carries (Int, RateUnit)
+    Rate,
+    // Expression for computed values - carries Expression
     Expr,
 }
 
@@ -643,9 +634,8 @@ type AppliesTo {
 
 enum AppliesToKind {
     Action,
+    Type,
     State,
-    Module,
-    All,
 }
 
 enum MeasurementPeriod {
@@ -662,10 +652,10 @@ type LoadConditions {
     concurrent_users: Option<Int>,
     concurrent_connections: Option<Int>,
     requests_per_second: Option<Int>,
-    // Note: Code uses Option<(i64, SizeUnit)> tuple
-    payload_size: Option<Int>,
-    // Note: Code uses Option<(i64, DurationUnit)> tuple
-    duration: Option<Int>,
+    // Tuple: (value, unit) for size with unit
+    payload_size: Option<(Int, SizeUnit)>,
+    // Tuple: (value, unit) for duration with unit
+    duration: Option<(Int, DurationUnit)>,
     span: Span,
 }
 
