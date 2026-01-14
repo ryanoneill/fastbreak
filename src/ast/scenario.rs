@@ -1,6 +1,6 @@
 //! Scenario AST nodes (Cucumber-inspired)
 
-use super::{Attribute, Expr, Ident};
+use super::{Attribute, Expr, Path};
 use crate::Span;
 use smol_str::SmolStr;
 
@@ -117,11 +117,11 @@ pub struct ThenClause {
     pub span: Span,
 }
 
-/// A variable binding: `name = expr`
+/// A variable binding: `name = expr` or `path.to.field = expr`
 #[derive(Debug, Clone, PartialEq)]
 pub struct Binding {
-    /// Variable name
-    pub name: Ident,
+    /// Variable name (supports dotted paths like `catalog.entries`)
+    pub name: Path,
     /// Value expression
     pub value: Expr,
     /// Span of the binding

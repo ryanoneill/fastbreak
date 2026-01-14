@@ -513,7 +513,7 @@ impl Analyzer {
         for binding in &scenario.given.bindings {
             let value_type = self.check_expr(&binding.value);
             self.symbols.define(Symbol::new(
-                binding.name.name.clone(),
+                binding.name.to_dotted_string(),
                 SymbolKind::Variable(value_type),
                 binding.name.span,
             ));
@@ -526,7 +526,7 @@ impl Analyzer {
         for binding in &scenario.given.bindings {
             let value_type = self.check_expr(&binding.value);
             self.symbols.define(Symbol::new(
-                binding.name.name.clone(),
+                binding.name.to_dotted_string(),
                 SymbolKind::Variable(value_type),
                 binding.name.span,
             ));
@@ -534,7 +534,7 @@ impl Analyzer {
         for binding in &scenario.when.bindings {
             let value_type = self.check_expr(&binding.value);
             self.symbols.define(Symbol::new(
-                binding.name.name.clone(),
+                binding.name.to_dotted_string(),
                 SymbolKind::Variable(value_type),
                 binding.name.span,
             ));
@@ -547,7 +547,7 @@ impl Analyzer {
         for binding in &scenario.given.bindings {
             let value_type = self.check_expr(&binding.value);
             self.symbols.define(Symbol::new(
-                binding.name.name.clone(),
+                binding.name.to_dotted_string(),
                 SymbolKind::Variable(value_type),
                 binding.name.span,
             ));
@@ -555,7 +555,7 @@ impl Analyzer {
         for binding in &scenario.when.bindings {
             let value_type = self.check_expr(&binding.value);
             self.symbols.define(Symbol::new(
-                binding.name.name.clone(),
+                binding.name.to_dotted_string(),
                 SymbolKind::Variable(value_type),
                 binding.name.span,
             ));
@@ -581,7 +581,7 @@ impl Analyzer {
         for binding in &scenario.given.bindings {
             let value_type = self.check_expr(&binding.value);
             self.symbols.define(Symbol::new(
-                binding.name.name.clone(),
+                binding.name.to_dotted_string(),
                 SymbolKind::Variable(value_type),
                 binding.name.span,
             ));
@@ -598,7 +598,7 @@ impl Analyzer {
             for binding in &given.bindings {
                 let value_type = self.check_expr(&binding.value);
                 self.symbols.define(Symbol::new(
-                    binding.name.name.clone(),
+                    binding.name.to_dotted_string(),
                     SymbolKind::Variable(value_type),
                     binding.name.span,
                 ));
@@ -610,7 +610,7 @@ impl Analyzer {
         for binding in &when.bindings {
             let value_type = self.check_expr(&binding.value);
             self.symbols.define(Symbol::new(
-                binding.name.name.clone(),
+                binding.name.to_dotted_string(),
                 SymbolKind::Variable(value_type),
                 binding.name.span,
             ));

@@ -912,7 +912,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_binding(&mut self) -> ParseResult<Binding> {
-        let name = self.parse_ident()?;
+        // Parse dotted path to support bindings like `catalog.entries = {}`
+        let name = self.parse_dotted_path()?;
         self.expect(&Token::Eq)?;
         let value = self.parse_expr()?;
         let span = name.span.merge(value.span);
@@ -3087,6 +3088,33 @@ mod tests {
         )
         .unwrap();
         assert_eq!(spec.scenarios.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_binding_with_dotted_name() {
+        // Test bindings with dotted names like catalog.entries = {}
+        let spec = parse(
+            r#"
+            scenario "test" {
+                given {
+                    catalog.entries = {},
+                }
+                when {
+                    result = add_entry("test"),
+                }
+                then {
+                    catalog.entries.len() == 1,
+                }
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.scenarios.len(), 1);
+        // Verify the binding name is a path with 2 segments
+        let binding = &spec.scenarios[0].given.bindings[0];
+        assert_eq!(binding.name.segments.len(), 2);
+        assert_eq!(binding.name.segments[0].name.as_str(), "catalog");
+        assert_eq!(binding.name.segments[1].name.as_str(), "entries");
     }
 
     #[test]

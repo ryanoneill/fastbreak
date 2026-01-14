@@ -102,6 +102,21 @@ impl Path {
     pub fn name(&self) -> Option<&Ident> {
         self.segments.last()
     }
+
+    /// Get the path as a dotted string (e.g., "catalog.entries")
+    ///
+    /// This is useful for binding names in scenarios where paths like
+    /// `catalog.entries = {}` should be represented as "catalog.entries"
+    #[must_use]
+    pub fn to_dotted_string(&self) -> SmolStr {
+        let s: String = self
+            .segments
+            .iter()
+            .map(|s| s.name.as_str())
+            .collect::<Vec<_>>()
+            .join(".");
+        SmolStr::new(s)
+    }
 }
 
 impl std::fmt::Display for Path {

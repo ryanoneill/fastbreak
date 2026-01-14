@@ -217,8 +217,9 @@ type Action {
 // Scenarios
 // ============================================================================
 
+// Binding supports dotted names for state field access, e.g., catalog.entries = {}
 type Binding {
-    name: Ident,
+    name: Path,
     value: Expression,
     span: Span,
 }

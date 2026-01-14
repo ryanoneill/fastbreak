@@ -294,6 +294,21 @@ scenario "Type alias forward reference" {
     }
 }
 
+scenario "Dotted binding names in scenarios" {
+    given {
+        // Bindings can use dotted paths to set state fields
+        // Note: Actual test uses escaped quotes, simplified here
+        source = "type Catalog { entries: Set<String> }"
+    }
+    when {
+        result = parse(source)
+    }
+    then {
+        // Parsing should succeed - actual dotted binding test is in Rust tests
+        result is Ok
+    }
+}
+
 // ============================================================================
 // Properties: System Guarantees
 // ============================================================================

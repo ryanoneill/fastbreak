@@ -352,7 +352,7 @@ impl<'a> SpecBuilder<'a> {
             .bindings
             .iter()
             .map(|b| CompiledAssignment {
-                name: b.name.name.clone(),
+                name: b.name.to_dotted_string(),
                 value: Arc::new(b.value.clone()),
                 span: b.span,
             })
@@ -369,7 +369,7 @@ impl<'a> SpecBuilder<'a> {
             .bindings
             .iter()
             .map(|b| CompiledWhenAction {
-                binding: Some(b.name.name.clone()),
+                binding: Some(b.name.to_dotted_string()),
                 expr: Arc::new(b.value.clone()),
                 span: b.span,
             })
