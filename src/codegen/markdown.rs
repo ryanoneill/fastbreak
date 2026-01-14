@@ -546,6 +546,7 @@ impl<'a> MarkdownGenerator<'a> {
     fn format_type(ty: &Type) -> String {
         match ty {
             Type::Int => "Int".to_string(),
+            Type::Float => "Float".to_string(),
             Type::String => "String".to_string(),
             Type::Bool => "Bool".to_string(),
             Type::Unit => "()".to_string(),

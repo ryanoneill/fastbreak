@@ -13,6 +13,8 @@ use std::sync::Arc;
 pub enum Type {
     /// Primitive integer type
     Int,
+    /// Primitive float type
+    Float,
     /// Primitive string type
     String,
     /// Primitive boolean type
@@ -61,7 +63,7 @@ impl Type {
     /// Check if this is a primitive type
     #[must_use]
     pub fn is_primitive(&self) -> bool {
-        matches!(self, Type::Int | Type::String | Type::Bool | Type::Unit)
+        matches!(self, Type::Int | Type::Float | Type::String | Type::Bool | Type::Unit)
     }
 
     /// Check if this is a collection type
@@ -90,6 +92,7 @@ impl Type {
     pub fn is_comparable(&self) -> bool {
         match self {
             Type::Int
+            | Type::Float
             | Type::String
             | Type::Bool
             | Type::Unit
@@ -111,6 +114,7 @@ impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Type::Int => write!(f, "Int"),
+            Type::Float => write!(f, "Float"),
             Type::String => write!(f, "String"),
             Type::Bool => write!(f, "Bool"),
             Type::Unit => write!(f, "()"),

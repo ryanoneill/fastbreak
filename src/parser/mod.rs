@@ -1584,6 +1584,22 @@ impl<'src> Parser<'src> {
                     _ => Ok(QualityValue::Int(n)),
                 }
             }
+            Some(Token::Float(n)) => {
+                let n = *n;
+                self.advance()?;
+
+                // Check for percent suffix
+                if self.check(&Token::Percent) {
+                    self.advance()?;
+                    Ok(QualityValue::Percentage(n))
+                } else {
+                    // Return as expression containing float literal
+                    Ok(QualityValue::Expr(Expr::new(
+                        ExprKind::Literal(Literal::Float(n)),
+                        self.current_span(),
+                    )))
+                }
+            }
             Some(_) => {
                 // Fall back to expression parsing
                 let expr = self.parse_expr()?;
@@ -1953,6 +1969,11 @@ impl<'src> Parser<'src> {
                 let n = *n;
                 let (_, span) = self.advance()?;
                 Ok(Expr::new(ExprKind::Literal(Literal::Int(n)), span))
+            }
+            Some(Token::Float(n)) => {
+                let n = *n;
+                let (_, span) = self.advance()?;
+                Ok(Expr::new(ExprKind::Literal(Literal::Float(n)), span))
             }
             Some(Token::String(s)) => {
                 let s = s.clone();
@@ -3919,5 +3940,58 @@ mod tests {
             load.duration,
             Some((5, crate::ast::DurationUnit::M))
         );
+    }
+
+    #[test]
+    fn test_parse_quality_decimal_percentage() {
+        // Test decimal percentage like 99.99%
+        let spec = parse(
+            r#"
+            quality reliability "high availability" {
+                metric: uptime,
+                target: >= 99.99%,
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.qualities.len(), 1);
+        assert_eq!(spec.qualities[0].target.op, crate::ast::QualityOp::GtEq);
+        match &spec.qualities[0].target.value {
+            crate::ast::QualityValue::Percentage(p) => {
+                assert!((*p - 99.99).abs() < 0.001, "Expected 99.99, got {}", p);
+            }
+            _ => panic!("Expected percentage value"),
+        }
+    }
+
+    #[test]
+    fn test_parse_quality_float_target() {
+        // Test float value without percentage
+        let spec = parse(
+            r#"
+            quality performance "response time" {
+                metric: latency_p99,
+                target: < 0.5,
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(spec.qualities.len(), 1);
+        assert_eq!(spec.qualities[0].target.op, crate::ast::QualityOp::Lt);
+        match &spec.qualities[0].target.value {
+            crate::ast::QualityValue::Int(n) => {
+                panic!("Expected float, got integer {}", n);
+            }
+            crate::ast::QualityValue::Expr(e) => {
+                // Float values are parsed as expressions containing float literals
+                match &e.kind {
+                    crate::ast::ExprKind::Literal(crate::ast::Literal::Float(f)) => {
+                        assert!((*f - 0.5).abs() < 0.001, "Expected 0.5, got {}", f);
+                    }
+                    _ => panic!("Expected float literal expression"),
+                }
+            }
+            _ => panic!("Expected expression or float value"),
+        }
     }
 }

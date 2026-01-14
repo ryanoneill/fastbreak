@@ -316,6 +316,11 @@ pub enum Token {
     Bang,
 
     // ========== Literals ==========
+    /// Float literal (must come before Integer for proper priority)
+    /// Matches: 3.14, 99.99, 0.5
+    #[regex(r"[0-9]+\.[0-9]+", priority = 3, callback = |lex| lex.slice().parse::<f64>().ok())]
+    Float(f64),
+
     /// Integer literal (non-negative; negation handled by parser)
     #[regex(r"[0-9]+", |lex| lex.slice().parse::<i64>().ok())]
     Integer(i64),
@@ -410,6 +415,7 @@ impl std::fmt::Display for Token {
             Token::AndAnd => write!(f, "&&"),
             Token::OrOr => write!(f, "||"),
             Token::Bang => write!(f, "!"),
+            Token::Float(n) => write!(f, "{n}"),
             Token::Integer(n) => write!(f, "{n}"),
             Token::String(s) => write!(f, "\"{s}\""),
             Token::Ident(s) => write!(f, "{s}"),
@@ -484,6 +490,32 @@ mod tests {
         // Negative integers are lexed as Minus followed by Integer
         assert_eq!(lex("-17"), vec![Token::Minus, Token::Integer(17)]);
         assert_eq!(lex("0"), vec![Token::Integer(0)]);
+    }
+
+    #[test]
+    fn test_floats() {
+        assert_eq!(lex("3.14"), vec![Token::Float(3.14)]);
+        assert_eq!(lex("99.99"), vec![Token::Float(99.99)]);
+        assert_eq!(lex("0.5"), vec![Token::Float(0.5)]);
+        // Negative floats are lexed as Minus followed by Float
+        assert_eq!(lex("-3.14"), vec![Token::Minus, Token::Float(3.14)]);
+        // Integer followed by dot and identifier should NOT be a float
+        assert_eq!(
+            lex("99.name"),
+            vec![Token::Integer(99), Token::Dot, Token::Ident("name".into())]
+        );
+    }
+
+    #[test]
+    fn test_percent() {
+        assert_eq!(lex("%"), vec![Token::Percent]);
+        // Percentage value: 99.99%
+        assert_eq!(
+            lex("99.99%"),
+            vec![Token::Float(99.99), Token::Percent]
+        );
+        // Integer percentage: 100%
+        assert_eq!(lex("100%"), vec![Token::Integer(100), Token::Percent]);
     }
 
     #[test]

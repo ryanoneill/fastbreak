@@ -969,6 +969,7 @@ impl Analyzer {
     fn check_literal(lit: &Literal) -> Type {
         match lit {
             Literal::Int(_) => Type::Int,
+            Literal::Float(_) => Type::Float,
             Literal::String(_) => Type::String,
             Literal::Bool(_) => Type::Bool,
             Literal::Unit => Type::Unit,

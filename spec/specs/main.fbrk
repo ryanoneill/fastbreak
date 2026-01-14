@@ -395,6 +395,8 @@ enum UnaryOp {
 enum Literal {
     // Integer literal: 42, -1
     Int,
+    // Float literal: 3.14, 99.99
+    Float,
     // String literal: "hello"
     StringLit,
     // Boolean literal: true, false
@@ -405,6 +407,13 @@ enum Literal {
 
 type IntLiteral {
     value: Int,
+}
+
+// Note: FloatLiteral uses f64 internally in the implementation
+// Float is not yet a first-class built-in type in the language
+type FloatLiteral {
+    // Represented as f64 in the AST (e.g., 3.14, 99.99)
+    value: Int,  // Placeholder: actual implementation uses f64
 }
 
 type StringLiteral {

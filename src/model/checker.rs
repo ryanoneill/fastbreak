@@ -519,6 +519,7 @@ impl<'a> Checker<'a> {
     fn eval_literal(lit: &Literal) -> Value {
         match lit {
             Literal::Int(n) => Value::Int(*n),
+            Literal::Float(n) => Value::Float(*n),
             Literal::String(s) => Value::String(Arc::from(s.as_str())),
             Literal::Bool(b) => Value::Bool(*b),
             Literal::Unit => Value::Unit,

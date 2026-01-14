@@ -497,8 +497,12 @@ enum Token {
 
     // ========== Literals ==========
     Integer,        // 42, 0, 100 (with i64 value)
+    Float,          // 3.14, 99.99 (with f64 value)
     String,         // "hello" (with SmolStr value)
     Ident,          // foo, User, _private (with SmolStr value)
+
+    // ========== Percentage ==========
+    Percent,        // % (suffix for percentage values)
 }
 
 // Lexed token with position information

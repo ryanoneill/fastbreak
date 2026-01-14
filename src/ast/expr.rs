@@ -205,6 +205,8 @@ pub enum ExprKind {
 pub enum Literal {
     /// Integer literal
     Int(i64),
+    /// Float literal
+    Float(f64),
     /// String literal
     String(SmolStr),
     /// Boolean literal

@@ -16,6 +16,8 @@ use std::sync::Arc;
 pub enum Value {
     /// Integer value
     Int(i64),
+    /// Float value
+    Float(f64),
     /// String value
     String(Arc<str>),
     /// Boolean value
@@ -174,6 +176,7 @@ impl Value {
     pub fn value_type(&self) -> Type {
         match self {
             Value::Int(_) => Type::Int,
+            Value::Float(_) => Type::Float,
             Value::String(_) => Type::String,
             Value::Bool(_) => Type::Bool,
             Value::Unit => Type::Unit,
@@ -212,6 +215,7 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Value::Int(n) => write!(f, "{n}"),
+            Value::Float(n) => write!(f, "{n}"),
             Value::String(s) => write!(f, "\"{s}\""),
             Value::Bool(b) => write!(f, "{b}"),
             Value::Unit => write!(f, "()"),
