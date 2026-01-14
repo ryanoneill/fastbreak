@@ -373,7 +373,7 @@ enum BinaryOp {
     // Logical operators
     And,        // and
     Or,         // or
-    Implies,    // =>
+    // Note: Implies is handled as ExpressionKind::Implies, not a binary operator
     // Set/collection operators
     In,         // in
     Union,      // union
@@ -550,6 +550,144 @@ type ModuleInfo {
     states: Set<String>,
     actions: Set<String>,
     imports: List<ResolvedImport>,
+}
+
+// ============================================================================
+// Quality Requirements (NFRs)
+// ============================================================================
+
+type Quality {
+    attributes: List<Attribute>,
+    category: QualityCategory,
+    description: String,
+    metric: Ident,
+    scale: Option<Scale>,
+    target: QualityTarget,
+    constraint: Option<Constraint>,
+    applies_to: Option<AppliesTo>,
+    measurement: Option<MeasurementPeriod>,
+    under_load: Option<LoadConditions>,
+    verified_by: List<VerificationMethod>,
+    properties: List<QualityProperty>,
+    span: Span,
+}
+
+enum QualityCategory {
+    Performance,
+    Reliability,
+    Security,
+    Usability,
+    Scalability,
+    Maintainability,
+}
+
+enum Scale {
+    Mean,
+    Median,
+    P50,
+    P90,
+    P95,
+    P99,
+    P999,
+    Max,
+    Min,
+}
+
+enum Constraint {
+    Hard,
+    Soft,
+}
+
+type QualityTarget {
+    op: QualityOp,
+    value: QualityValue,
+    span: Span,
+}
+
+enum QualityOp {
+    Lt,
+    LtEq,
+    Gt,
+    GtEq,
+    Eq,
+}
+
+enum QualityValue {
+    // Duration value: 100ms, 5s, 1m
+    Duration,
+    // Size value: 1KB, 10MB
+    Size,
+    // Rate value: 1000/s, 50/min
+    Rate,
+    // Percentage value: 99.9%
+    Percentage,
+    // Integer value: 1000
+    Integer,
+    // Expression for computed values
+    Expr,
+}
+
+type AppliesTo {
+    kind: AppliesToKind,
+    name: Ident,
+}
+
+enum AppliesToKind {
+    Action,
+    State,
+    Module,
+    All,
+}
+
+enum MeasurementPeriod {
+    PerRequest,
+    PerSecond,
+    PerMinute,
+    Hourly,
+    Daily,
+    Weekly,
+    Monthly,
+}
+
+type LoadConditions {
+    concurrent_users: Option<Int>,
+    concurrent_connections: Option<Int>,
+    requests_per_second: Option<Int>,
+    payload_size: Option<Int>,
+    duration: Option<Int>,
+    span: Span,
+}
+
+type VerificationMethod {
+    kind: VerificationKind,
+    name: String,
+    span: Span,
+}
+
+enum VerificationKind {
+    Test,
+    Monitor,
+    Benchmark,
+    Audit,
+}
+
+type QualityProperty {
+    name: Ident,
+    value: QualityPropertyValue,
+    span: Span,
+}
+
+enum QualityPropertyValue {
+    // String value
+    StringVal,
+    // Integer value
+    IntVal,
+    // Boolean value
+    BoolVal,
+    // Identifier reference
+    IdentVal,
+    // Expression value
+    ExprVal,
 }
 
 type Specification {
