@@ -279,6 +279,21 @@ scenario "Import with alias" {
     }
 }
 
+scenario "Type alias forward reference" {
+    given {
+        // Type alias defined before struct that uses it
+        source = "type UserId = Int where self > 0\n\ntype User { id: UserId, name: String }"
+    }
+    when {
+        spec = parse(source)
+        errors = analyze(spec.unwrap())
+    }
+    then {
+        // Type alias should be resolvable when used in later type
+        errors.len() == 0
+    }
+}
+
 // ============================================================================
 // Properties: System Guarantees
 // ============================================================================

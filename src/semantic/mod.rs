@@ -22,7 +22,7 @@ pub use types::{
 use crate::ast::{
     Action, Alternative, Attribute, AttributeArg, BinaryOp, BuiltInType, EnumDef, Expr, ExprKind,
     Literal, Pattern, PatternKind, Quality, QualityValue, QuantBindingKind, Relation, Scenario,
-    Specification, StateBlock, TypeDef, TypeRef, TypeRefKind, UnaryOp,
+    Specification, StateBlock, TypeAlias, TypeDef, TypeRef, TypeRefKind, UnaryOp,
 };
 use crate::Span;
 use indexmap::IndexMap;
@@ -148,6 +148,35 @@ impl Analyzer {
                 ));
                 self.types.register_enum(EnumInfo::new(type_id));
             }
+        }
+
+        // Register type aliases (so they can be referenced by later types)
+        for alias in &spec.type_aliases {
+            self.register_type_alias(alias);
+        }
+    }
+
+    fn register_type_alias(&mut self, alias: &TypeAlias) {
+        let name = &alias.name.name;
+        if self.symbols.is_defined_locally(name) {
+            if let Some(existing) = self.symbols.lookup(name) {
+                self.diagnostics.error(SemanticError::duplicate(
+                    "type alias",
+                    name.as_str(),
+                    alias.name.span,
+                    existing.span,
+                ));
+            }
+        } else {
+            // Type aliases are registered as types - they introduce a type name
+            let type_id = self.types.alloc_type_id(name.clone());
+            self.symbols.define(Symbol::new(
+                name.clone(),
+                SymbolKind::Type(type_id.clone()),
+                alias.name.span,
+            ));
+            // Register as struct info for now (type aliases expand to their base type)
+            self.types.register_struct(StructInfo::new(type_id));
         }
     }
 
@@ -1943,6 +1972,23 @@ mod tests {
         let analyzer = analyze_source("type PositiveInt = Int");
         // For now, we just test that it doesn't crash
         assert!(analyzer.succeeded());
+    }
+
+    #[test]
+    fn test_analyze_type_alias_forward_reference() {
+        // Type alias should be resolvable when used in later type definitions
+        let analyzer = analyze_source(
+            r#"
+            type UserId = Int where self > 0
+            type User { id: UserId, name: String }
+            "#,
+        );
+        // UserId should be found when resolving User.id field type
+        assert!(
+            analyzer.succeeded(),
+            "Expected no errors but got: {:?}",
+            analyzer.errors()
+        );
     }
 
     #[test]
