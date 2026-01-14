@@ -8,6 +8,8 @@ When verifying that the fastbreak specification matches the code implementation:
 - The spec files in `spec/specs/` must accurately reflect the actual implementation
 - If a difference is found, either the spec or the code must be updated to match
 - Document intentional differences with comments explaining the divergence
+- **Follow the exhaustive verification procedure in [`docs/spec-verification.md`](docs/spec-verification.md)**
+- Verification must be field-by-field and variant-by-variant - partial verification creates false confidence
 
 ## Testing
 

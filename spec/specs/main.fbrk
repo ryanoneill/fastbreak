@@ -17,6 +17,8 @@ type Span {
     end: Int,
 }
 
+// Note: Conceptual enum for documentation - subsumed by BuiltInType in implementation.
+// Float is a semantic Type but not a BuiltInType (cannot write `x: Float` in specs).
 enum PrimitiveType {
     Int,
     String,
@@ -283,12 +285,14 @@ type Property {
 // Expressions
 // ============================================================================
 
+// Note: Rust implementation uses shortened names: Expr, ExprKind
 type Expression {
     kind: ExpressionKind,
     span: Span,
 }
 
 // Full enumeration of expression kinds
+// Note: Rust implementation uses ExprKind
 enum ExpressionKind {
     // Literals: integers, strings, booleans, unit
     Literal,
@@ -386,18 +390,23 @@ enum UnaryOp {
 // Literals
 // ============================================================================
 
+// Note: In Rust implementation, variants carry associated data:
+// Int(i64), Float(f64), String(SmolStr), Bool(bool), Unit
 enum Literal {
     // Integer literal: 42, -1
     Int,
     // Float literal: 3.14, 99.99
     Float,
-    // String literal: "hello"
-    StringLit,
+    // String literal: "hello" - Rust: String(SmolStr)
+    String,
     // Boolean literal: true, false
     Bool,
     // Unit/empty tuple: ()
     Unit,
 }
+
+// Note: The following literal types are conceptual - in Rust implementation,
+// values are embedded directly in Literal enum variants: Int(i64), Float(f64), etc.
 
 type IntLiteral {
     value: Int,
@@ -423,6 +432,8 @@ type BoolLiteral {
 // Quantifiers
 // ============================================================================
 
+// Note: Conceptual type for documentation - not implemented as separate enum.
+// In Rust, forall/exists are ExprKind variants directly.
 enum QuantifierKind {
     // Universal: forall x in xs => predicate
     ForAll,
@@ -436,10 +447,11 @@ type QuantBinding {
     span: Span,
 }
 
+// Rust: pub enum QuantBindingKind { InCollection(Expr), Typed(TypeRef) }
 enum QuantBindingKind {
-    // x in collection
+    // x in collection - carries Expression
     InCollection,
-    // x: Type
+    // x: Type - carries TypeRef
     Typed,
 }
 
@@ -497,6 +509,7 @@ type FieldPattern {
     span: Span,
 }
 
+// Note: Conceptual type - in Rust, block is ExprKind::Block(Vec<Expr>)
 type BlockExpression {
     statements: List<Expression>,
     span: Span,
@@ -637,6 +650,7 @@ enum QualityValue {
 type AppliesTo {
     kind: AppliesToKind,
     name: Ident,
+    span: Span,
 }
 
 enum AppliesToKind {
