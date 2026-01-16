@@ -30,8 +30,9 @@ Release a new version of fastbreak. Takes an optional version argument (major, m
 
 1. Run `cargo test --quiet` - all tests must pass
 2. Run `cargo run -- check spec/specs/` - specs must validate
-3. Check `git status` - working tree should be clean (warn if not)
-4. Check for unpublished commits since last tag
+3. Run `/verify-spec` - spec must match Rust implementation (exhaustive field-by-field check)
+4. Check `git status` - working tree should be clean (warn if not)
+5. Check for unpublished commits since last tag
 
 ### Step 3: Update Version
 
