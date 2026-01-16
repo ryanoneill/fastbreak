@@ -35,6 +35,8 @@ pub enum SymbolKind {
     Type(TypeId),
     /// An enum definition
     Enum(TypeId),
+    /// An enum variant (enum_name, variant_name, type)
+    EnumVariant(SmolStr, SmolStr, Type),
     /// A state definition
     State(SmolStr),
     /// An action definition

@@ -150,6 +150,33 @@ impl Analyzer {
             }
         }
 
+        // Second pass: register enum variants that don't conflict with existing symbols
+        // This is done after all enums are registered so variant names don't shadow enum names
+        for enum_def in &spec.enums {
+            let name = &enum_def.name.name;
+            if let Some(symbol) = self.symbols.lookup(name) {
+                if let SymbolKind::Enum(type_id) = &symbol.kind {
+                    let enum_type = Type::Enum(type_id.clone());
+                    for variant in &enum_def.variants {
+                        let variant_name = &variant.name.name;
+                        // Only register if variant name doesn't conflict with existing symbols
+                        // (users can still use qualified syntax like Color::Red)
+                        if !self.symbols.is_defined_locally(variant_name) {
+                            self.symbols.define(Symbol::new(
+                                variant_name.clone(),
+                                SymbolKind::EnumVariant(
+                                    name.clone(),
+                                    variant_name.clone(),
+                                    enum_type.clone(),
+                                ),
+                                variant.name.span,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
         // Register type aliases (so they can be referenced by later types)
         for alias in &spec.type_aliases {
             self.register_type_alias(alias);
@@ -1034,11 +1061,36 @@ impl Analyzer {
             return Type::Unknown; // These need context to determine type
         }
 
+        // Handle qualified enum variant paths like Color::Red
+        if path.segments.len() == 2 {
+            let enum_name = path.segments[0].name.as_str();
+            let variant_name = path.segments[1].name.as_str();
+
+            // Check if first segment is an enum
+            if let Some(symbol) = self.symbols.lookup(enum_name) {
+                if let SymbolKind::Enum(type_id) = &symbol.kind {
+                    // Verify the variant exists
+                    if let Some(enum_info) = self.types.get_enum(enum_name) {
+                        if enum_info.variants.contains_key(variant_name) {
+                            return Type::Enum(type_id.clone());
+                        }
+                        self.diagnostics.error(SemanticError::undefined(
+                            "enum variant",
+                            variant_name,
+                            span,
+                        ));
+                        return Type::Error;
+                    }
+                }
+            }
+        }
+
         if let Some(symbol) = self.symbols.lookup(name) {
             match &symbol.kind {
                 SymbolKind::Variable(ty) | SymbolKind::Parameter(ty) | SymbolKind::Field(ty) => {
                     ty.clone()
                 }
+                SymbolKind::EnumVariant(_enum_name, _variant_name, ty) => ty.clone(),
                 SymbolKind::Action(action_name) => {
                     if let Some(info) = self.types.get_action(action_name) {
                         let params: Vec<Type> = info.params.values().cloned().collect();
@@ -2025,5 +2077,59 @@ mod tests {
         assert!(analyzer.diagnostics.errors().iter().any(|e| {
             matches!(e, SemanticError::DuplicateId { id, .. } if id == "NFR-001")
         }));
+    }
+
+    #[test]
+    fn test_analyze_enum_variant_in_scenario_binding() {
+        // Enum variants should be resolvable with qualified syntax (Color::Red)
+        let analyzer = analyze_source(
+            r#"
+            enum Color { Red, Green, Blue }
+
+            scenario "pick a color" {
+                given {
+                    favorite = Color::Red,
+                }
+                when {
+                    result = favorite,
+                }
+                then {
+                    result == Color::Red,
+                }
+            }
+            "#,
+        );
+        assert!(
+            analyzer.succeeded(),
+            "Expected no errors but got: {:?}",
+            analyzer.errors()
+        );
+    }
+
+    #[test]
+    fn test_analyze_enum_variant_unqualified() {
+        // Unqualified enum variants (just "Red") should also resolve
+        let analyzer = analyze_source(
+            r#"
+            enum Color { Red, Green, Blue }
+
+            scenario "pick a color" {
+                given {
+                    favorite = Red,
+                }
+                when {
+                    result = favorite,
+                }
+                then {
+                    result == Red,
+                }
+            }
+            "#,
+        );
+        assert!(
+            analyzer.succeeded(),
+            "Expected no errors but got: {:?}",
+            analyzer.errors()
+        );
     }
 }

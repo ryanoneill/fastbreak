@@ -459,6 +459,23 @@ scenario "Analyze action calls in invariants" {
     }
 }
 
+scenario "Enum variants in expressions" {
+    given {
+        // Enum variants should be usable with qualified syntax (Color::Red)
+        // This tests that variants are registered and can be resolved
+        source = "enum Color { Red, Green, Blue }\n\ntype Preference { favorite: Color }"
+    }
+    when {
+        spec = parse(source)
+        errors = analyze(spec.unwrap())
+    }
+    then {
+        // Enum definition should parse and analyze without errors
+        // Actual variant resolution test is in Rust tests
+        errors.len() == 0
+    }
+}
+
 property "All errors with spans have valid line numbers" {
     always {
         forall error: CompilerError where error.context is Some =>
