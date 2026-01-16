@@ -167,6 +167,7 @@ impl<'src> Parser<'src> {
     }
 
     /// Parse attribute arguments: `"string", ident, 123`
+    /// Keywords are accepted as identifiers in this context (e.g., @tag(quality))
     fn parse_attribute_args(&mut self) -> ParseResult<Vec<AttributeArg>> {
         let mut args = Vec::new();
 
@@ -188,14 +189,19 @@ impl<'src> Parser<'src> {
                     let ident = self.parse_ident()?;
                     AttributeArg::Ident(ident)
                 }
-                Some(token) => {
-                    let token = token.clone();
-                    let span = self.current_span();
-                    return Err(ParseError::unexpected(
-                        "attribute argument (string, identifier, or integer)",
-                        &token,
-                        span,
-                    ));
+                Some(_) => {
+                    // Try to parse keywords as identifiers (e.g., @tag(quality))
+                    if let Some(ident) = self.try_keyword_as_ident() {
+                        AttributeArg::Ident(ident)
+                    } else {
+                        let token = self.peek().unwrap().clone();
+                        let span = self.current_span();
+                        return Err(ParseError::unexpected(
+                            "attribute argument (string, identifier, or integer)",
+                            &token,
+                            span,
+                        ));
+                    }
                 }
                 None => return Err(ParseError::unexpected_eof("attribute argument", self.eof_span())),
             };
@@ -2939,6 +2945,44 @@ impl<'src> Parser<'src> {
     /// Check if current token is an identifier with a specific name
     fn check_keyword_ident(&self, expected: &str) -> bool {
         matches!(self.peek(), Some(Token::Ident(name)) if name.as_str() == expected)
+    }
+
+    /// Try to parse a keyword token as an identifier (for contextual use)
+    /// Returns the keyword name as an Ident if current token is a keyword
+    fn try_keyword_as_ident(&mut self) -> Option<Ident> {
+        let span = self.current_span();
+        let name = match self.peek()? {
+            Token::Quality => "quality",
+            Token::State => "state",
+            Token::Action => "action",
+            Token::Type => "type",
+            Token::Enum => "enum",
+            Token::Property => "property",
+            Token::Scenario => "scenario",
+            Token::Relation => "relation",
+            Token::Invariant => "invariant",
+            Token::Requires => "requires",
+            Token::Ensures => "ensures",
+            Token::Always => "always",
+            Token::Eventually => "eventually",
+            Token::Forall => "forall",
+            Token::Exists => "exists",
+            Token::Match => "match",
+            Token::If => "if",
+            Token::Else => "else",
+            Token::Let => "let",
+            Token::Use => "use",
+            Token::In => "in",
+            Token::Where => "where",
+            Token::And => "and",
+            Token::Or => "or",
+            Token::Not => "not",
+            Token::True => "true",
+            Token::False => "false",
+            _ => return None,
+        };
+        self.advance().ok()?;
+        Some(Ident::new(name, span))
     }
 
     fn is_at_end(&self) -> bool {
