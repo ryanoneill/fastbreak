@@ -1,0 +1,182 @@
+// Lambda Expressions
+// Demonstrates: lambda syntax, higher-order functions
+
+// =============================================================================
+// Supporting Types
+// =============================================================================
+
+type User {
+    id: Int,
+    name: String,
+    age: Int,
+    score: Int,
+    active: Bool,
+}
+
+type Item {
+    id: Int,
+    name: String,
+    price: Int,
+}
+
+// =============================================================================
+// Supporting State
+// =============================================================================
+
+state Store {
+    users: Set<User>,
+    items: Set<Item>,
+    values: List<Int>,
+}
+
+// =============================================================================
+// Lambda Syntax
+// =============================================================================
+
+// Lambda parameters must be wrapped in parentheses: (param) => expr
+// Multiple parameters: (a, b) => a + b
+// Typed parameters: (x: Int) => x * 2
+
+// =============================================================================
+// Lambda with Collections - Map
+// =============================================================================
+
+// Map transformation
+action map_double()
+    ensures {
+        [1, 2, 3].map((x) => x * 2) == [2, 4, 6]
+    }
+
+action map_square()
+    ensures {
+        [1, 2, 3].map((x) => x * x) == [1, 4, 9]
+    }
+
+// =============================================================================
+// Lambda with Collections - Filter
+// =============================================================================
+
+// Filter with lambda
+action filter_positive()
+    ensures {
+        [-2, -1, 0, 1, 2].filter((x) => x > 0) == [1, 2]
+    }
+
+action filter_even()
+    ensures {
+        [1, 2, 3, 4, 5, 6].filter((x) => x % 2 == 0) == [2, 4, 6]
+    }
+
+// =============================================================================
+// Lambda with Collections - Fold
+// =============================================================================
+
+action fold_sum()
+    ensures {
+        [1, 2, 3, 4, 5].fold(0, (acc, x) => acc + x) == 15
+    }
+
+action fold_product()
+    ensures {
+        [1, 2, 3, 4].fold(1, (acc, x) => acc * x) == 24
+    }
+
+// =============================================================================
+// Any and All Predicates
+// =============================================================================
+
+action predicate_any()
+    ensures {
+        [1, 2, 3, 4, 5].any((x) => x > 3) and
+        not [1, 2, 3].any((x) => x > 5)
+    }
+
+action predicate_all()
+    ensures {
+        [2, 4, 6, 8].all((x) => x % 2 == 0) and
+        not [1, 2, 3, 4].all((x) => x % 2 == 0)
+    }
+
+// =============================================================================
+// Chained Lambda Operations
+// =============================================================================
+
+action chained_filter_map()
+    ensures {
+        [1, 2, 3, 4, 5]
+            .filter((x) => x > 2)
+            .map((x) => x * 10) == [30, 40, 50]
+    }
+
+action chained_map_filter()
+    ensures {
+        [1, 2, 3, 4, 5]
+            .map((x) => x * 2)
+            .filter((x) => x > 5) == [6, 8, 10]
+    }
+
+// =============================================================================
+// Lambda with Let Expressions
+// =============================================================================
+
+// Note: Lambdas are primarily used with collection methods (map, filter, etc.)
+// Storing lambdas in let bindings is not currently supported
+
+action with_let_and_map()
+    ensures {
+        (let nums = [1, 2, 3] in nums.map((x) => x * 2)) == [2, 4, 6]
+    }
+
+// =============================================================================
+// Lambda in Scenarios
+// =============================================================================
+
+scenario "Lambda transformations" {
+    given {
+        values = [1, 2, 3, 4, 5]
+    }
+    when {
+        doubled = values.map((x) => x * 2)
+        evens = values.filter((x) => x % 2 == 0)
+        sum = values.fold(0, (acc, x) => acc + x)
+    }
+    then {
+        doubled == [2, 4, 6, 8, 10] and
+        evens == [2, 4] and
+        sum == 15
+    }
+}
+
+scenario "User filtering with lambda" {
+    given {
+        users = {
+            User { id: 1, name: "Alice", age: 25, score: 100, active: true },
+            User { id: 2, name: "Bob", age: 17, score: 80, active: true },
+            User { id: 3, name: "Carol", age: 30, score: 95, active: false },
+        }
+    }
+    when {
+        adult_count = users.filter((u) => u.age >= 18).len()
+        high_scorer_count = users.filter((u) => u.score >= 90).len()
+    }
+    then {
+        adult_count == 2 and
+        high_scorer_count == 2
+    }
+}
+
+// =============================================================================
+// Lambda with Sets
+// =============================================================================
+
+action set_lambda_filter()
+    ensures {
+        {1, 2, 3, 4, 5}.filter((x) => x > 2).len() == 3
+    }
+
+action set_lambda_all()
+    ensures {
+        {2, 4, 6, 8}.all((x) => x % 2 == 0) and
+        {1, 2, 3, 4, 5}.any((x) => x > 4)
+    }
+

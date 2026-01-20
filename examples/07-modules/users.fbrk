@@ -1,0 +1,127 @@
+// Users Module
+// Demonstrates: imports, using imported types
+// Note: This file shows the import syntax but won't pass validation standalone
+//       because cross-module resolution requires all files to be loaded together
+
+// =============================================================================
+// Module Declaration
+// =============================================================================
+
+module users
+
+// =============================================================================
+// Imports
+// =============================================================================
+
+// Import specific types from common module
+use common::{UserId, Email, Status, Timestamp, AuditInfo}
+use common::{PositiveInt}
+use common::{Error, ValidationError}
+use common::{PageRequest, PageInfo}
+
+// =============================================================================
+// User Types (using imported types)
+// =============================================================================
+
+// Note: When validated standalone, these types will show errors
+// because the imported types aren't available. This is expected
+// behavior - imports are resolved at project level.
+
+// User entity definition
+type User {
+    id: Int,
+    email: String,
+    name: String,
+    age: Int,
+}
+
+// User profile (subset of user data)
+type UserProfile {
+    id: Int,
+    name: String,
+    email: String,
+}
+
+// User credentials
+type Credentials {
+    email: String,
+    password_hash: String,
+}
+
+// =============================================================================
+// User State
+// =============================================================================
+
+state UserStore {
+    users: Set<User>,
+    next_id: Int,
+
+    invariant "All users have positive IDs" {
+        forall u in users => u.id > 0
+    }
+
+    invariant "User IDs are unique" {
+        forall u1, u2 in users where u1 != u2 => u1.id != u2.id
+    }
+}
+
+// =============================================================================
+// User Actions
+// =============================================================================
+
+action create_user(email: String, name: String) -> Result<User, String>
+    requires {
+        not exists u in users where u.email == email
+    }
+    ensures {
+        match result {
+            Ok(user) => user in users' and user.email == email,
+            Err(_) => users' == users,
+        }
+    }
+
+action find_user(id: Int) -> Option<User>
+    ensures {
+        match result {
+            Some(user) => user in users and user.id == id,
+            None => not exists u in users where u.id == id,
+        }
+    }
+
+action delete_user(id: Int) -> Result<User, String>
+    requires {
+        exists u in users where u.id == id
+    }
+    ensures {
+        match result {
+            Ok(user) => user.id == id and not exists u in users' where u.id == id,
+            Err(_) => users' == users,
+        }
+    }
+
+// =============================================================================
+// User Scenarios
+// =============================================================================
+
+scenario "Create and find user" {
+    given {
+        users = {}
+        next_id = 1
+    }
+    when {
+        result = create_user("alice@example.com", "Alice")
+        found = find_user(1)
+    }
+    then {
+        result is Ok and found is Some
+    }
+}
+
+// =============================================================================
+// User Properties
+// =============================================================================
+
+property "No duplicate emails" {
+    forall u1, u2 in users where u1 != u2 => u1.email != u2.email
+}
+

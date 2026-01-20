@@ -1,0 +1,318 @@
+// Assertion Patterns
+// Demonstrates: various assertion expressions in scenarios
+
+// =============================================================================
+// Supporting Types
+// =============================================================================
+
+type User {
+    id: Int,
+    name: String,
+    active: Bool,
+    age: Int,
+}
+
+type Item {
+    id: Int,
+    name: String,
+}
+
+enum Status {
+    Active,
+    Inactive,
+    Pending,
+}
+
+// =============================================================================
+// Supporting State
+// =============================================================================
+
+state Store {
+    users: Set<User>,
+    items: Set<Item>,
+}
+
+// =============================================================================
+// Supporting Actions
+// =============================================================================
+
+action create_user(name: String) -> Result<User, String>
+action find_user(id: Int) -> Option<User>
+action get_status(id: Int) -> Status
+action add_user(user: User)
+action deactivate_user(id: Int)
+
+// =============================================================================
+// Result Pattern Assertions
+// =============================================================================
+
+// Check Result variant with 'is' keyword
+scenario "Result success check" {
+    given {
+        users = {}
+    }
+    when {
+        result = create_user("Alice")
+    }
+    then {
+        result is Ok
+    }
+}
+
+// Access Result inner value
+scenario "Result value extraction" {
+    given {
+        users = {}
+    }
+    when {
+        result = create_user("Bob")
+    }
+    then {
+        result is Ok
+        match result {
+            Ok(user) => user.name == "Bob",
+            Err(_) => false,
+        }
+    }
+}
+
+// Check for error result
+scenario "Result error check" {
+    given {
+        users = { User { id: 1, name: "Existing", active: true, age: 25 } }
+    }
+    when {
+        result = create_user("")  // Empty name causes error
+    }
+    then {
+        result is Err
+    }
+}
+
+// =============================================================================
+// Option Pattern Assertions
+// =============================================================================
+
+// Check Option variant
+scenario "Option Some check" {
+    given {
+        users = { User { id: 1, name: "Alice", active: true, age: 30 } }
+    }
+    when {
+        found = find_user(1)
+    }
+    then {
+        found is Some
+    }
+}
+
+// Check Option None
+scenario "Option None check" {
+    given {
+        users = { User { id: 1, name: "Alice", active: true, age: 30 } }
+    }
+    when {
+        missing = find_user(999)
+    }
+    then {
+        missing is None
+    }
+}
+
+// Compare Some and None results
+scenario "Option comparison" {
+    given {
+        users = { User { id: 1, name: "Alice", active: true, age: 30 } }
+    }
+    when {
+        found = find_user(1)
+        missing = find_user(999)
+    }
+    then {
+        found is Some
+        missing is None
+    }
+}
+
+// =============================================================================
+// Enum Assertions
+// =============================================================================
+
+// Match enum variants
+scenario "Enum variant check" {
+    given {
+        users = { User { id: 1, name: "Active User", active: true, age: 25 } }
+    }
+    when {
+        status = get_status(1)
+    }
+    then {
+        status == Status::Active
+    }
+}
+
+// Pattern match on enum
+scenario "Enum pattern matching" {
+    given {
+        users = { User { id: 1, name: "User", active: false, age: 25 } }
+    }
+    when {
+        status = get_status(1)
+    }
+    then {
+        match status {
+            Active => false,
+            Inactive => true,
+            Pending => false,
+        }
+    }
+}
+
+// =============================================================================
+// Quantifier Assertions
+// =============================================================================
+
+// Universal quantifier (forall)
+scenario "All users are adults" {
+    given {
+        users = {
+            User { id: 1, name: "Alice", active: true, age: 25 },
+            User { id: 2, name: "Bob", active: true, age: 30 },
+            User { id: 3, name: "Carol", active: false, age: 28 },
+        }
+    }
+    when {
+        count = users.len()
+    }
+    then {
+        forall u in users => u.age >= 18
+    }
+}
+
+// Existential quantifier (exists)
+scenario "At least one active user" {
+    given {
+        users = {
+            User { id: 1, name: "Alice", active: true, age: 25 },
+            User { id: 2, name: "Bob", active: false, age: 30 },
+        }
+    }
+    when {
+        count = users.len()
+    }
+    then {
+        exists u in users where u.active
+    }
+}
+
+// Combined quantifiers
+scenario "All active users are adults" {
+    given {
+        users = {
+            User { id: 1, name: "Alice", active: true, age: 25 },
+            User { id: 2, name: "Bob", active: true, age: 30 },
+            User { id: 3, name: "Teen", active: false, age: 16 },
+        }
+    }
+    when {
+        count = users.len()
+    }
+    then {
+        forall u in users where u.active => u.age >= 18
+    }
+}
+
+// Uniqueness with quantifiers
+scenario "User IDs are unique" {
+    given {
+        users = {
+            User { id: 1, name: "Alice", active: true, age: 25 },
+            User { id: 2, name: "Bob", active: true, age: 30 },
+            User { id: 3, name: "Carol", active: true, age: 28 },
+        }
+    }
+    when {
+        count = users.len()
+    }
+    then {
+        forall u1, u2 in users where u1 != u2 =>
+            u1.id != u2.id
+    }
+}
+
+// =============================================================================
+// Collection Assertions
+// =============================================================================
+
+// Set membership
+scenario "Check item membership" {
+    given {
+        items = { Item { id: 1, name: "Widget" } }
+    }
+    when {
+        widget = Item { id: 1, name: "Widget" }
+    }
+    then {
+        widget in items
+    }
+}
+
+// Collection size
+scenario "Collection size assertions" {
+    given {
+        users = {
+            User { id: 1, name: "A", active: true, age: 20 },
+            User { id: 2, name: "B", active: true, age: 25 },
+        }
+        items = {}
+    }
+    when {
+        user_count = users.len()
+        item_count = items.len()
+    }
+    then {
+        user_count == 2
+        item_count == 0
+        users.len() > items.len()
+    }
+}
+
+// =============================================================================
+// Comparison Assertions
+// =============================================================================
+
+// Numeric comparisons
+scenario "Numeric assertions" {
+    given {
+        users = {
+            User { id: 1, name: "Young", active: true, age: 20 },
+            User { id: 2, name: "Old", active: true, age: 50 },
+        }
+    }
+    when {
+        youngest = 20
+        oldest = 50
+    }
+    then {
+        youngest < oldest
+        oldest - youngest == 30
+        youngest >= 18
+        oldest <= 100
+    }
+}
+
+// Boolean assertions
+scenario "Boolean assertions" {
+    given {
+        users = { User { id: 1, name: "Active", active: true, age: 25 } }
+    }
+    when {
+        user = User { id: 1, name: "Active", active: true, age: 25 }
+    }
+    then {
+        user.active == true
+        user.active
+        not (user.active == false)
+    }
+}
+

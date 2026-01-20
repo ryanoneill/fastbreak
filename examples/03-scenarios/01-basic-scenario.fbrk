@@ -1,0 +1,197 @@
+// Basic Scenarios
+// Demonstrates: scenario keyword, given, when, then blocks
+
+// =============================================================================
+// Supporting Types
+// =============================================================================
+
+type Item {
+    id: Int,
+    name: String,
+    price: Int,
+}
+
+type User {
+    id: Int,
+    name: String,
+}
+
+// =============================================================================
+// Supporting State
+// =============================================================================
+
+state Cart {
+    items: Set<Item>,
+    total: Int,
+}
+
+state Counter {
+    count: Int,
+    max: Int,
+}
+
+// =============================================================================
+// Supporting Actions
+// =============================================================================
+
+action add_item(item: Item) -> Bool
+action remove_item(id: Int) -> Bool
+action clear_cart() -> Bool
+action increment() -> Int
+action decrement() -> Int
+action reset() -> Int
+
+// =============================================================================
+// Simple Scenarios
+// =============================================================================
+
+// Basic scenario with empty initial state
+scenario "Add item to empty cart" {
+    given {
+        items = {}
+        total = 0
+    }
+    when {
+        result = add_item(Item { id: 1, name: "Widget", price: 100 })
+    }
+    then {
+        items.len() == 1
+    }
+}
+
+// Scenario with non-empty initial state
+scenario "Add item to existing cart" {
+    given {
+        items = { Item { id: 1, name: "First", price: 50 } }
+        total = 50
+    }
+    when {
+        result = add_item(Item { id: 2, name: "Second", price: 75 })
+    }
+    then {
+        items.len() == 2
+    }
+}
+
+// =============================================================================
+// Scenarios with Multiple Actions
+// =============================================================================
+
+// Multiple actions in sequence
+scenario "Add and remove item" {
+    given {
+        items = {}
+        total = 0
+    }
+    when {
+        added = add_item(Item { id: 1, name: "Widget", price: 100 })
+        removed = remove_item(1)
+    }
+    then {
+        items.len() == 0
+    }
+}
+
+// Complex sequence of actions
+scenario "Build and clear cart" {
+    given {
+        items = {}
+        total = 0
+    }
+    when {
+        r1 = add_item(Item { id: 1, name: "A", price: 10 })
+        r2 = add_item(Item { id: 2, name: "B", price: 20 })
+        r3 = add_item(Item { id: 3, name: "C", price: 30 })
+        cleared = clear_cart()
+    }
+    then {
+        items.len() == 0 and total == 0
+    }
+}
+
+// =============================================================================
+// Scenarios with Multiple Assertions
+// =============================================================================
+
+// Multiple then conditions combined with 'and'
+scenario "Verify cart contents" {
+    given {
+        items = {}
+        total = 0
+    }
+    when {
+        r1 = add_item(Item { id: 1, name: "Widget", price: 100 })
+        r2 = add_item(Item { id: 2, name: "Gadget", price: 200 })
+    }
+    then {
+        items.len() == 2 and
+        exists i in items where i.id == 1 and
+        exists i in items where i.id == 2 and
+        forall i in items => i.price > 0
+    }
+}
+
+// =============================================================================
+// Counter Scenarios
+// =============================================================================
+
+scenario "Increment counter" {
+    given {
+        count = 0
+        max = 10
+    }
+    when {
+        new_count = increment()
+    }
+    then {
+        count == 1
+    }
+}
+
+scenario "Reset counter" {
+    given {
+        count = 5
+        max = 10
+    }
+    when {
+        new_count = reset()
+    }
+    then {
+        count == 0
+    }
+}
+
+scenario "Multiple increments" {
+    given {
+        count = 0
+        max = 10
+    }
+    when {
+        c1 = increment()
+        c2 = increment()
+        c3 = increment()
+    }
+    then {
+        count == 3 and count < max
+    }
+}
+
+// =============================================================================
+// Scenarios with Variable Bindings
+// =============================================================================
+
+scenario "Capture action results" {
+    given {
+        items = { Item { id: 1, name: "Existing", price: 50 } }
+        total = 50
+    }
+    when {
+        initial_count = items.len()
+        result = add_item(Item { id: 2, name: "New", price: 100 })
+        final_count = items.len()
+    }
+    then {
+        final_count == initial_count + 1
+    }
+}
+

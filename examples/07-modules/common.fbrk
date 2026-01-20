@@ -1,0 +1,153 @@
+// Common Types Module
+// Demonstrates: module declaration, shared type definitions
+
+// =============================================================================
+// Module Declaration
+// =============================================================================
+
+// Declare this file's module name
+module common
+
+// =============================================================================
+// Identifier Types
+// =============================================================================
+
+// Strongly-typed identifiers prevent mixing up IDs
+type UserId {
+    value: Int,
+}
+
+type AccountId {
+    value: Int,
+}
+
+type OrderId {
+    value: Int,
+}
+
+type ProductId {
+    value: Int,
+}
+
+// =============================================================================
+// Value Types
+// =============================================================================
+
+// Email representation
+type Email {
+    address: String,
+}
+
+// Money representation
+type Money {
+    amount: Int,
+    currency: String,
+}
+
+// Timestamp
+type Timestamp {
+    epoch_ms: Int,
+}
+
+// Duration in milliseconds
+type Duration {
+    ms: Int,
+}
+
+// =============================================================================
+// Common Enums
+// =============================================================================
+
+// Generic status that can be reused
+enum Status {
+    Active,
+    Inactive,
+    Pending,
+    Suspended,
+}
+
+// Priority levels
+enum Priority {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+// Operation result type
+enum OperationResult {
+    Completed,
+    Failed,
+    InProgress,
+}
+
+// =============================================================================
+// Common Type Aliases
+// =============================================================================
+
+// Refined types for validation
+type PositiveInt = Int where self > 0
+
+type NonNegativeInt = Int where self >= 0
+
+type Percentage = Int where self >= 0 and self <= 100
+
+// =============================================================================
+// Common Structures
+// =============================================================================
+
+// Address for multiple uses
+type Address {
+    street: String,
+    city: String,
+    country: String,
+    postal_code: String,
+}
+
+// Contact information
+type ContactInfo {
+    email: Email,
+    phone: String,
+}
+
+// Audit information
+type AuditInfo {
+    created_at: Timestamp,
+    updated_at: Timestamp,
+    created_by: UserId,
+}
+
+// =============================================================================
+// Error Types
+// =============================================================================
+
+// Common error structure
+type Error {
+    code: String,
+    message: String,
+}
+
+// Validation error
+type ValidationError {
+    field: String,
+    message: String,
+}
+
+// =============================================================================
+// Pagination Types
+// =============================================================================
+
+// Pagination request
+type PageRequest {
+    page: Int,
+    size: Int,
+}
+
+// Pagination response metadata
+type PageInfo {
+    page: Int,
+    size: Int,
+    total: Int,
+    has_next: Bool,
+}
+

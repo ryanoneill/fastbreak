@@ -1,0 +1,128 @@
+// State Invariants
+// Demonstrates: invariant keyword, descriptions, constraint expressions
+
+// =============================================================================
+// Supporting Types
+// =============================================================================
+
+type User {
+    id: Int,
+    email: String,
+    age: Int,
+}
+
+type Account {
+    id: Int,
+    balance: Int,
+    owner_id: Int,
+}
+
+// =============================================================================
+// Simple Invariants
+// =============================================================================
+
+state Counter {
+    count: Int,
+    max: Int,
+
+    // Basic comparison invariant
+    invariant "Count is non-negative" {
+        count >= 0
+    }
+
+    // Invariant relating two fields
+    invariant "Count within maximum" {
+        count <= max
+    }
+}
+
+// =============================================================================
+// Invariants with Quantifiers
+// =============================================================================
+
+state UserSystem {
+    users: Set<User>,
+    max_users: Int,
+
+    // Simple count constraint
+    invariant "User count within limit" {
+        users.len() <= max_users
+    }
+
+    // Universal quantifier: all users must satisfy condition
+    invariant "All users have positive IDs" {
+        forall u in users => u.id > 0
+    }
+
+    // Universal quantifier with age constraint
+    invariant "All users are adults" {
+        forall u in users => u.age >= 18
+    }
+}
+
+// =============================================================================
+// Uniqueness Invariants
+// =============================================================================
+
+state Registry {
+    users: Set<User>,
+
+    // Uniqueness: no two users share the same ID
+    invariant "User IDs are unique" {
+        forall u1, u2 in users where u1 != u2 =>
+            u1.id != u2.id
+    }
+
+    // Uniqueness: no two users share the same email
+    invariant "Emails are unique" {
+        forall u1, u2 in users where u1 != u2 =>
+            u1.email != u2.email
+    }
+}
+
+// =============================================================================
+// Relational Invariants
+// =============================================================================
+
+state Bank {
+    accounts: Set<Account>,
+    users: Set<User>,
+
+    // All account owners must exist in users
+    invariant "Account owners exist" {
+        forall a in accounts =>
+            exists u in users where u.id == a.owner_id
+    }
+
+    // All balances must be non-negative
+    invariant "No negative balances" {
+        forall a in accounts => a.balance >= 0
+    }
+}
+
+// =============================================================================
+// Complex Invariants
+// =============================================================================
+
+state OrderSystem {
+    items: Set<Item>,
+    inventory: Map<Int, Int>,
+
+    // All items must have inventory entries
+    invariant "All items have inventory" {
+        forall item in items =>
+            item.id in inventory.keys()
+    }
+
+    // All inventory quantities are non-negative
+    invariant "Non-negative inventory" {
+        forall id in inventory.keys() =>
+            inventory[id] >= 0
+    }
+}
+
+// Supporting type
+type Item {
+    id: Int,
+    name: String,
+}

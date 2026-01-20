@@ -1,0 +1,60 @@
+// Type Aliases and Refinements
+// Demonstrates: type aliases, where clause, self keyword
+
+// =============================================================================
+// Simple Aliases
+// =============================================================================
+
+// Alias gives semantic meaning to primitive types
+type UserId = Int
+type Username = String
+type Timestamp = Int
+
+// =============================================================================
+// Aliases with Refinement Predicates
+// =============================================================================
+
+// Integer constraints using 'self'
+type PositiveInt = Int where self > 0
+type NonNegativeInt = Int where self >= 0
+type Percentage = Int where self >= 0 and self <= 100
+
+// String constraints
+type NonEmptyString = String where self.len() > 0
+type Email = String where self.contains("@")
+type Url = String where self.contains("://")
+
+// =============================================================================
+// Complex Refinements
+// =============================================================================
+
+// Age must be reasonable
+type Age = Int where self >= 0 and self <= 150
+
+// Port number in valid range
+type Port = Int where self >= 1 and self <= 65535
+
+// HTTP status code
+type HttpStatus = Int where self >= 100 and self <= 599
+
+// =============================================================================
+// Using Refined Types
+// =============================================================================
+
+// Types can use refined aliases for validation
+type User {
+    id: UserId,
+    name: NonEmptyString,
+    email: Email,
+    age: Age,
+}
+
+type Server {
+    host: NonEmptyString,
+    port: Port,
+}
+
+type ApiResponse {
+    status: HttpStatus,
+    body: String,
+}

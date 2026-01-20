@@ -1,0 +1,160 @@
+// Temporal Properties
+// Demonstrates: always, eventually operators
+// Note: Properties use typed quantifier bindings rather than state field access
+
+// =============================================================================
+// Supporting Types
+// =============================================================================
+
+type User {
+    id: Int,
+    verified: Bool,
+    active: Bool,
+}
+
+type Task {
+    id: Int,
+    started: Bool,
+    completed: Bool,
+}
+
+enum OrderStatus {
+    Pending,
+    Processing,
+    Shipped,
+    Delivered,
+    Cancelled,
+}
+
+type Order {
+    id: Int,
+    status: OrderStatus,
+}
+
+type SystemConfig {
+    initialized: Bool,
+    running: Bool,
+    error_count: Int,
+}
+
+// =============================================================================
+// Always Properties (Safety)
+// =============================================================================
+
+// Something that must never be violated
+property "System initialization implies running" {
+    always {
+        forall s: SystemConfig => s.initialized implies s.running
+    }
+}
+
+// Invariant expressed as temporal property
+property "Error count never negative" {
+    always {
+        forall s: SystemConfig => s.error_count >= 0
+    }
+}
+
+// Safety property about data
+property "Users always have positive IDs" {
+    always {
+        forall u: User => u.id > 0
+    }
+}
+
+// Safety about data consistency
+property "Running system is valid" {
+    always {
+        forall s: SystemConfig => s.running implies s.error_count >= 0
+    }
+}
+
+// =============================================================================
+// Eventually Properties (Liveness)
+// =============================================================================
+
+// Something that must eventually happen
+property "Users eventually verified" {
+    eventually {
+        forall u: User => u.verified
+    }
+}
+
+// Task completion guarantee
+property "Tasks eventually complete" {
+    eventually {
+        forall t: Task => t.completed
+    }
+}
+
+// =============================================================================
+// Order Lifecycle Properties
+// =============================================================================
+
+// Order validation
+property "Orders have valid IDs" {
+    always {
+        forall o: Order => o.id > 0
+    }
+}
+
+// =============================================================================
+// User Lifecycle Properties
+// =============================================================================
+
+// User validation
+property "Active users are valid" {
+    always {
+        forall u: User => u.active implies u.id > 0
+    }
+}
+
+// =============================================================================
+// System-wide Temporal Properties
+// =============================================================================
+
+// System configuration validation
+property "System config is valid" {
+    always {
+        forall s: SystemConfig =>
+            s.error_count >= 0 and
+            (s.initialized implies s.running or s.error_count > 0)
+    }
+}
+
+// =============================================================================
+// Bounded Properties
+// =============================================================================
+
+// Error count bounded (safety)
+property "Errors are bounded" {
+    always {
+        forall s: SystemConfig => s.error_count <= 100
+    }
+}
+
+// Task validation
+property "Tasks are properly initialized" {
+    always {
+        forall t: Task => t.id > 0 and (t.completed implies t.started)
+    }
+}
+
+// =============================================================================
+// Data Integrity Properties
+// =============================================================================
+
+// User data integrity
+property "User data is valid" {
+    always {
+        forall u: User => u.id > 0 and (u.verified implies u.active)
+    }
+}
+
+// Order status validation
+property "Order has valid status" {
+    always {
+        forall o: Order => o.id > 0
+    }
+}
+

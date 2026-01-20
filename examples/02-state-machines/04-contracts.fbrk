@@ -1,0 +1,149 @@
+// Action Contracts
+// Demonstrates: requires, ensures, state', old(), result
+
+// =============================================================================
+// Supporting Types
+// =============================================================================
+
+type User {
+    id: Int,
+    name: String,
+}
+
+// =============================================================================
+// State Definitions
+// =============================================================================
+
+state Counter {
+    count: Int,
+    max: Int,
+}
+
+state UserStore {
+    users: Set<User>,
+    next_id: Int,
+}
+
+// =============================================================================
+// Actions with Preconditions (requires)
+// =============================================================================
+
+// Simple precondition
+action increment()
+    requires {
+        count < max
+    }
+
+// Precondition with comparison
+action decrement()
+    requires {
+        count > 0
+    }
+
+// Multiple preconditions combined with 'and'
+action add(n: Int)
+    requires {
+        n > 0 and count + n <= max
+    }
+
+// =============================================================================
+// Actions with Postconditions (ensures)
+// =============================================================================
+
+// Postcondition using primed notation (next state)
+action set_to_zero()
+    ensures {
+        count' == 0
+    }
+
+// Postcondition relating old and new state
+action increment_by_one()
+    ensures {
+        count' == count + 1
+    }
+
+// Multiple postconditions combined with 'and'
+action double()
+    ensures {
+        count' == count * 2 and count' <= max
+    }
+
+// =============================================================================
+// Combined requires and ensures
+// =============================================================================
+
+action safe_add(n: Int)
+    requires {
+        n > 0 and count + n <= max
+    }
+    ensures {
+        count' == count + n
+    }
+
+action safe_subtract(n: Int)
+    requires {
+        n > 0 and count - n >= 0
+    }
+    ensures {
+        count' == count - n
+    }
+
+// =============================================================================
+// Using 'result' in Postconditions
+// =============================================================================
+
+// Return value is captured in 'result'
+action get_and_reset() -> Int
+    ensures {
+        result == count and count' == 0
+    }
+
+action get_current() -> Int
+    ensures {
+        result == count and count' == count
+    }
+
+// Result with conditional postcondition using match
+action try_increment() -> Bool
+    ensures {
+        (result == true and count' == count + 1) or
+        (result == false and count' == count)
+    }
+
+// =============================================================================
+// Using 'old()' for Complex Postconditions
+// =============================================================================
+
+action add_user(user: User)
+    requires {
+        not exists u in users where u.id == user.id
+    }
+    ensures {
+        user in users' and users'.len() == old(users).len() + 1
+    }
+
+action remove_user(id: Int) -> Bool
+    requires {
+        exists u in users where u.id == id
+    }
+    ensures {
+        result == true and
+        users'.len() == old(users).len() - 1 and
+        not exists u in users' where u.id == id
+    }
+
+// =============================================================================
+// Complex Contract Example
+// =============================================================================
+
+action create_user(name: String) -> Result<User, String>
+    requires {
+        name.len() > 0
+    }
+    ensures {
+        match result {
+            Ok(user) => user in users' and user.id == old(next_id) and next_id' == old(next_id) + 1,
+            Err(_) => users' == users and next_id' == next_id,
+        }
+    }
+

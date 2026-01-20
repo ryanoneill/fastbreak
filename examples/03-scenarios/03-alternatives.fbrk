@@ -1,0 +1,270 @@
+// Alternative Flows
+// Demonstrates: alt keyword, conditional branches, error paths
+
+// =============================================================================
+// Supporting Types
+// =============================================================================
+
+type User {
+    id: Int,
+    email: String,
+    verified: Bool,
+}
+
+type Order {
+    id: Int,
+    user_id: Int,
+    total: Int,
+}
+
+type Item {
+    id: Int,
+    name: String,
+    stock: Int,
+}
+
+// =============================================================================
+// Supporting State
+// =============================================================================
+
+state System {
+    users: Set<User>,
+    orders: Set<Order>,
+    items: Set<Item>,
+    next_order_id: Int,
+}
+
+// =============================================================================
+// Supporting Actions
+// =============================================================================
+
+action register(email: String) -> Result<User, String>
+action login(email: String) -> Result<User, String>
+action place_order(user_id: Int, item_id: Int, quantity: Int) -> Result<Order, String>
+action verify_user(id: Int) -> Result<User, String>
+action purchase_item(item_id: Int) -> Result<Item, String>
+
+// =============================================================================
+// Simple Alternative Flows
+// =============================================================================
+
+// Main success path with error alternative
+scenario "User registration" {
+    given {
+        users = {}
+    }
+    when {
+        result = register("new@example.com")
+    }
+    then {
+        result is Ok and users.len() == 1
+    }
+
+    alt "Email already exists" when {
+        users.len() > 0
+    } {
+        then {
+            result is Err
+        }
+    }
+}
+
+// Alternative with different outcomes
+scenario "User login" {
+    given {
+        users = { User { id: 1, email: "user@example.com", verified: true } }
+    }
+    when {
+        result = login("user@example.com")
+    }
+    then {
+        result is Ok
+    }
+
+    alt "User not found" when {
+        users.len() == 0
+    } {
+        then {
+            result is Err
+        }
+    }
+
+    alt "User not verified" when {
+        forall u in users => not u.verified
+    } {
+        then {
+            result is Err
+        }
+    }
+}
+
+// =============================================================================
+// Multiple Alternative Flows
+// =============================================================================
+
+scenario "Place order" {
+    given {
+        users = { User { id: 1, email: "buyer@example.com", verified: true } }
+        items = { Item { id: 100, name: "Widget", stock: 10 } }
+        orders = {}
+        next_order_id = 1
+    }
+    when {
+        result = place_order(1, 100, 2)
+    }
+    then {
+        result is Ok and orders.len() == 1
+    }
+
+    alt "User does not exist" when {
+        users.len() == 0
+    } {
+        then {
+            result is Err and orders.len() == 0
+        }
+    }
+
+    alt "Item does not exist" when {
+        items.len() == 0
+    } {
+        then {
+            result is Err and orders.len() == 0
+        }
+    }
+
+    alt "Insufficient stock" when {
+        forall i in items => i.stock < 2
+    } {
+        then {
+            result is Err and orders.len() == 0
+        }
+    }
+}
+
+// =============================================================================
+// Alternative Flows with State Changes
+// =============================================================================
+
+scenario "Verify user account" {
+    given {
+        users = { User { id: 1, email: "unverified@example.com", verified: false } }
+    }
+    when {
+        result = verify_user(1)
+    }
+    then {
+        result is Ok
+    }
+
+    alt "User already verified" when {
+        forall u in users => u.verified
+    } {
+        then {
+            result is Ok
+        }
+    }
+
+    alt "User not found" when {
+        users.len() == 0
+    } {
+        then {
+            result is Err
+        }
+    }
+}
+
+// =============================================================================
+// Complex Alternative Conditions
+// =============================================================================
+
+scenario "Purchase item with validation" {
+    given {
+        items = {
+            Item { id: 1, name: "InStock", stock: 5 },
+            Item { id: 2, name: "OutOfStock", stock: 0 },
+        }
+    }
+    when {
+        result = purchase_item(1)
+    }
+    then {
+        result is Ok
+    }
+
+    alt "Out of stock" when {
+        forall i in items where i.id == 1 => i.stock == 0
+    } {
+        then {
+            result is Err
+        }
+    }
+
+    alt "Item not found" when {
+        not exists i in items where i.id == 1
+    } {
+        then {
+            result is Err
+        }
+    }
+}
+
+// =============================================================================
+// Alternative Flows for Edge Cases
+// =============================================================================
+
+scenario "Register with edge cases" {
+    given {
+        users = {}
+    }
+    when {
+        result = register("valid@example.com")
+    }
+    then {
+        result is Ok and users.len() == 1
+    }
+
+    alt "Empty email" when {
+        true  // Represents when empty email is passed
+    } {
+        then {
+            result is Err and users.len() == 0
+        }
+    }
+}
+
+// =============================================================================
+// Scenario with Multiple Actions and Alternatives
+// =============================================================================
+
+scenario "Complete purchase flow" {
+    given {
+        users = { User { id: 1, email: "buyer@example.com", verified: true } }
+        items = { Item { id: 1, name: "Product", stock: 10 } }
+        orders = {}
+        next_order_id = 1
+    }
+    when {
+        login_result = login("buyer@example.com")
+        order_result = place_order(1, 1, 3)
+    }
+    then {
+        login_result is Ok and order_result is Ok and orders.len() == 1
+    }
+
+    alt "Login fails" when {
+        users.len() == 0
+    } {
+        then {
+            login_result is Err and orders.len() == 0
+        }
+    }
+
+    alt "Order fails after login" when {
+        forall i in items => i.stock < 3
+    } {
+        then {
+            login_result is Ok and order_result is Err and orders.len() == 0
+        }
+    }
+}
+

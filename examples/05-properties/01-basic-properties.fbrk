@@ -1,0 +1,115 @@
+// Basic Properties
+// Demonstrates: property keyword, simple assertions, quantifiers
+// Note: Properties use typed quantifier bindings like `forall x: Type => ...`
+// rather than directly referencing state fields.
+
+// =============================================================================
+// Supporting Types
+// =============================================================================
+
+type User {
+    id: Int,
+    email: String,
+    age: Int,
+    active: Bool,
+}
+
+type Account {
+    id: Int,
+    owner_id: Int,
+    balance: Int,
+}
+
+type Item {
+    id: Int,
+    name: String,
+    price: Int,
+    in_stock: Bool,
+}
+
+// =============================================================================
+// Type Constraint Properties
+// =============================================================================
+
+// Properties about type invariants using typed bindings
+
+property "All users have valid IDs" {
+    forall u: User => u.id > 0
+}
+
+property "All accounts have non-negative balance" {
+    forall a: Account => a.balance >= 0
+}
+
+property "All items have positive prices" {
+    forall i: Item => i.price > 0
+}
+
+// =============================================================================
+// Uniqueness Properties (Conceptual)
+// =============================================================================
+
+// These properties express uniqueness constraints using typed bindings
+// Note: In practice, uniqueness is often enforced via invariants
+
+property "User data consistency" {
+    forall u: User => u.id > 0 and u.age >= 0
+}
+
+property "Account data consistency" {
+    forall a: Account => a.id > 0 and a.owner_id > 0 and a.balance >= 0
+}
+
+// =============================================================================
+// Implication Properties
+// =============================================================================
+
+// Properties using logical implication
+
+property "Active users have valid status" {
+    forall u: User => u.active implies u.id > 0
+}
+
+property "Valid account ownership" {
+    forall a: Account => a.balance > 0 implies a.owner_id > 0
+}
+
+// =============================================================================
+// Business Rule Properties
+// =============================================================================
+
+// Age constraint
+property "Valid user ages" {
+    forall u: User => u.age >= 0 and u.age <= 150
+}
+
+// Balance constraint
+property "Reasonable account balances" {
+    forall a: Account => a.balance <= 1000000000
+}
+
+// Price constraint
+property "Reasonable item prices" {
+    forall i: Item => i.price >= 0 and i.price <= 1000000
+}
+
+// =============================================================================
+// Complex Properties
+// =============================================================================
+
+// Combining multiple conditions
+property "Comprehensive user validation" {
+    forall u: User =>
+        u.id > 0 and
+        u.age >= 0 and
+        (u.active implies u.age >= 18)
+}
+
+// Account validation
+property "Comprehensive account validation" {
+    forall a: Account =>
+        a.id > 0 and
+        a.owner_id > 0 and
+        a.balance >= 0
+}
+

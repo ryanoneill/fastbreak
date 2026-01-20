@@ -1,0 +1,84 @@
+// Enum Definitions
+// Demonstrates: enum keyword, variants, variants with data
+
+// =============================================================================
+// Simple Enums (No Associated Data)
+// =============================================================================
+
+// Basic enumeration of colors
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+// Status values for an entity
+enum Status {
+    Pending,
+    Active,
+    Suspended,
+}
+
+// Priority levels
+enum Priority {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+// =============================================================================
+// Using Enums in Types
+// =============================================================================
+
+type Task {
+    id: Int,
+    title: String,
+    status: Status,
+    priority: Priority,
+}
+
+type Pixel {
+    x: Int,
+    y: Int,
+    color: Color,
+}
+
+// =============================================================================
+// Enums with Associated Data
+// =============================================================================
+
+// Result type with success value or error message
+// Note: Ok, Err, Some, None are reserved keywords in Fastbreak
+// Tuple-style variants use positional types: Variant(Type)
+enum ApiResult {
+    Success(Int),
+    Failure(String),
+}
+
+// Option-like enum
+enum MaybeUser {
+    SomeUser(User),
+    NoUser,
+}
+
+// Event with different payload types
+// Multiple tuple fields: Variant(Type1, Type2)
+enum Event {
+    Created(Int),
+    Updated(Int, String),
+    Deleted(Int),
+}
+
+// Struct-style variants use named fields: Variant { field: Type }
+enum Message {
+    Text { content: String },
+    Data { id: Int, payload: String },
+    Empty,
+}
+
+// Supporting type for events
+type User {
+    id: Int,
+    name: String,
+}

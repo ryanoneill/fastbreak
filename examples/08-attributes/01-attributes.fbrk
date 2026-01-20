@@ -1,0 +1,281 @@
+// Attributes
+// Demonstrates: all attribute patterns and usage
+
+// =============================================================================
+// String Argument Attributes
+// =============================================================================
+
+// The @id attribute provides a unique identifier
+@id("TYPE-001")
+type User {
+    id: Int,
+    name: String,
+}
+
+// Multiple string arguments
+@id("TYPE-002")
+@rationale("Core domain entity for customer management")
+type Customer {
+    id: Int,
+    email: String,
+}
+
+// =============================================================================
+// Integer Argument Attributes
+// =============================================================================
+
+// Priority levels
+@priority(1)
+type CriticalConfig {
+    setting: String,
+}
+
+@priority(2)
+type ImportantConfig {
+    setting: String,
+}
+
+@priority(3)
+type NormalConfig {
+    setting: String,
+}
+
+// Severity levels
+@severity(1)
+type FatalError {
+    message: String,
+}
+
+@severity(2)
+type SeriousError {
+    message: String,
+}
+
+@severity(3)
+type MinorError {
+    message: String,
+}
+
+// =============================================================================
+// Identifier Argument Attributes
+// =============================================================================
+
+// Category using identifier (not string)
+@category(security)
+type Credential {
+    token: String,
+}
+
+@category(audit)
+type AuditLog {
+    event: String,
+    timestamp: Int,
+}
+
+@category(core)
+type SystemState {
+    running: Bool,
+}
+
+// =============================================================================
+// Flag Attributes (No Arguments)
+// =============================================================================
+
+// Mark as deprecated
+@deprecated
+type LegacyUser {
+    id: Int,
+}
+
+// =============================================================================
+// Multiple Attributes Combined
+// =============================================================================
+
+@id("TYPE-010")
+@category(security)
+@priority(1)
+@rationale("Sensitive data requires special handling")
+type SecureToken {
+    value: String,
+    expires_at: Int,
+}
+
+@id("TYPE-011")
+@deprecated
+@rationale("Use NewPaymentMethod instead")
+type OldPaymentMethod {
+    card_number: String,
+}
+
+// =============================================================================
+// Attributes on Enums
+// =============================================================================
+
+@id("ENUM-001")
+enum Status {
+    Active,
+    Inactive,
+    Pending,
+}
+
+@id("ENUM-002")
+@category(core)
+enum Priority {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+@deprecated
+@rationale("Use Priority enum instead")
+enum OldPriority {
+    Normal,
+    Important,
+}
+
+// =============================================================================
+// Attributes on State
+// =============================================================================
+
+@id("STATE-001")
+@category(core)
+state Counter {
+    count: Int,
+    max: Int,
+
+    @id("INV-001")
+    @rationale("Prevents overflow")
+    invariant "Count within bounds" {
+        count >= 0 and count <= max
+    }
+
+    @id("INV-002")
+    @category(safety)
+    invariant "Maximum is reasonable" {
+        max <= 1000000
+    }
+}
+
+// =============================================================================
+// Attributes on Actions
+// =============================================================================
+
+@id("ACTION-001")
+action increment()
+
+@id("ACTION-002")
+@category(mutation)
+action decrement()
+
+@id("ACTION-003")
+@rationale("Safe bounded increment")
+action safe_increment()
+    requires {
+        count < max
+    }
+    ensures {
+        count' == count + 1
+    }
+
+@id("ACTION-004")
+@deprecated
+@rationale("Use safe_increment instead")
+action unsafe_increment()
+
+// =============================================================================
+// Attributes on Scenarios
+// =============================================================================
+
+@id("SCENARIO-001")
+@category(happy_path)
+scenario "Basic increment" {
+    given {
+        count = 0
+        max = 10
+    }
+    when {
+        result = increment()
+    }
+    then {
+        count == 1
+    }
+}
+
+@id("SCENARIO-002")
+@category(edge_case)
+@priority(1)
+scenario "Increment at boundary" {
+    given {
+        count = 9
+        max = 10
+    }
+    when {
+        result = increment()
+    }
+    then {
+        count == 10
+    }
+}
+
+// =============================================================================
+// Attributes on Properties
+// =============================================================================
+
+// Note: Properties use typed quantifiers with types, not states
+// The CounterValue type mirrors the Counter state structure
+
+type CounterValue {
+    count: Int,
+    max: Int,
+}
+
+@id("PROP-001")
+property "Count never negative" {
+    forall c: CounterValue => c.count >= 0
+}
+
+@id("PROP-002")
+@category(safety)
+property "Count within maximum" {
+    forall c: CounterValue => c.count <= c.max
+}
+
+// =============================================================================
+// Attributes on Quality Requirements
+// =============================================================================
+
+@id("NFR-001")
+quality performance "Response time" {
+    metric: latency,
+    target: < 100ms,
+}
+
+@id("NFR-002")
+@category(reliability)
+@priority(1)
+quality reliability "System uptime" {
+    metric: availability,
+    target: >= 99.9%,
+}
+
+@id("NFR-003")
+@rationale("PCI-DSS compliance requirement")
+quality security "Data encryption" {
+    metric: encryption_strength,
+    target: >= 256,
+}
+
+// =============================================================================
+// Traceability Example
+// =============================================================================
+
+// This demonstrates how attributes enable requirements traceability
+
+@id("REQ-100")
+@rationale("Business requirement: Users must have unique emails")
+type RegistrationRequest {
+    email: String,
+    name: String,
+}
+

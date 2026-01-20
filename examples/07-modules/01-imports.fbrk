@@ -1,0 +1,88 @@
+// Import Syntax Examples
+// Demonstrates: all import patterns and syntax variations
+// Note: This file shows import syntax patterns. When validated standalone,
+//       imports will fail because referenced modules aren't loaded.
+
+// =============================================================================
+// Module Declaration
+// =============================================================================
+
+// Declare module with hierarchical name
+module examples.imports
+
+// =============================================================================
+// Import Syntax Patterns
+// =============================================================================
+
+// Single item import
+use common::{UserId}
+
+// Multiple item import
+use common::{Email, Timestamp}
+
+// Import with alias (using 'as' keyword)
+use common::{Status as UserStatus}
+
+// Import from nested module path
+use auth.tokens::{Token, RefreshToken}
+
+// Import many items at once
+use common::{
+    AccountId,
+    OrderId,
+    ProductId,
+    Money,
+    Duration,
+}
+
+// Multiple aliases in one import
+use common::{
+    Priority as TaskPriority,
+    OperationResult as OpResult,
+}
+
+// =============================================================================
+// Example Types Using Imports
+// =============================================================================
+
+// Note: These types demonstrate how imported types would be used.
+// Since imports can't be resolved standalone, we use local definitions.
+
+type LocalUser {
+    id: Int,
+    email: String,
+    status: String,
+    created_at: Int,
+}
+
+type LocalAccount {
+    id: Int,
+    owner_id: Int,
+    balance: Int,
+}
+
+// =============================================================================
+// Import Best Practices (Comments)
+// =============================================================================
+
+// Good practices:
+// - Import specific items you need: use common::{UserId, Email}
+// - Use aliases for clarity: use common::{Status as UserStatus}
+// - Group related imports: use common::{UserId, AccountId, OrderId}
+
+// Organization patterns:
+// - Group by source module
+// - Group by type category (types, enums, aliases)
+// - Alphabetical ordering
+
+// =============================================================================
+// State Using Local Types
+// =============================================================================
+
+state MyStore {
+    accounts: Set<LocalAccount>,
+    users: Set<LocalUser>,
+}
+
+action get_account(id: Int) -> Option<LocalAccount>
+

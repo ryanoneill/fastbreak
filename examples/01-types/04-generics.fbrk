@@ -1,0 +1,81 @@
+// Generic Types
+// Demonstrates: type parameters, generic collections
+
+// =============================================================================
+// Basic Type for Examples
+// =============================================================================
+
+type User {
+    id: Int,
+    name: String,
+}
+
+// =============================================================================
+// Generic Type Definitions
+// =============================================================================
+
+// A container holding a single value of any type
+type Container<T> {
+    value: T,
+}
+
+// A pair of two values
+type Pair<A, B> {
+    first: A,
+    second: B,
+}
+
+// =============================================================================
+// Using Built-in Generic Collections
+// =============================================================================
+
+// Set - unordered collection without duplicates
+type UserRegistry {
+    users: Set<User>,
+    admin_ids: Set<Int>,
+}
+
+// List - ordered sequence
+type Timeline {
+    events: List<String>,
+    timestamps: List<Int>,
+}
+
+// Map - key-value storage
+type UserCache {
+    by_id: Map<Int, User>,
+    by_name: Map<String, User>,
+}
+
+// =============================================================================
+// Option and Result Types
+// =============================================================================
+
+// Option<T> for optional values
+type Profile {
+    user: User,
+    bio: Option<String>,
+    website: Option<String>,
+}
+
+// Result<T, E> for operations that can fail
+type FetchResult {
+    user_result: Result<User, String>,
+}
+
+// =============================================================================
+// Nested Generics
+// =============================================================================
+
+// Complex nested generic types
+type Database {
+    // Map of table names to sets of records
+    tables: Map<String, Set<User>>,
+    // List of optional values
+    pending: List<Option<User>>,
+}
+
+// Groups of users by category
+type UserGroups {
+    groups: Map<String, Set<User>>,
+}

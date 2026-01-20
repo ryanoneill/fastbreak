@@ -1,0 +1,242 @@
+// Complete Quality Requirements
+// Demonstrates: all quality requirement fields and patterns
+
+// =============================================================================
+// Supporting Definitions
+// =============================================================================
+
+// Actions that quality requirements can apply to
+action query_users() -> List<User>
+action create_user(name: String) -> Result<User, String>
+action process_payment(amount: Int) -> Result<Receipt, String>
+action search(query: String) -> List<SearchResult>
+
+// Types for context
+type User {
+    id: Int,
+    name: String,
+}
+
+type Receipt {
+    id: Int,
+    amount: Int,
+}
+
+type SearchResult {
+    id: Int,
+    score: Int,
+}
+
+// =============================================================================
+// Complete Performance Requirements
+// =============================================================================
+
+@id("NFR-001")
+quality performance "Database query latency" {
+    metric: latency,
+    scale: p99,
+    target: < 50ms,
+    constraint: hard,
+    applies_to: action query_users,
+    measurement: per_request,
+    under_load: {
+        concurrent_users: 1000,
+        requests_per_second: 500,
+    },
+    verified_by: [
+        test "load_test_queries",
+        monitor "datadog_db_latency",
+        benchmark "query_benchmark",
+    ],
+}
+
+@id("NFR-002")
+quality performance "API endpoint response time" {
+    metric: latency,
+    scale: p95,
+    target: < 200ms,
+    constraint: hard,
+    applies_to: action create_user,
+    measurement: per_request,
+    under_load: {
+        concurrent_users: 500,
+        requests_per_second: 100,
+    },
+    verified_by: [
+        test "api_load_test",
+        monitor "newrelic_apm",
+    ],
+}
+
+@id("NFR-003")
+quality performance "Search response time" {
+    metric: latency,
+    scale: p50,
+    target: < 100ms,
+    constraint: soft,
+    applies_to: action search,
+    measurement: per_request,
+    verified_by: [
+        benchmark "search_benchmark",
+    ],
+}
+
+// =============================================================================
+// Complete Reliability Requirements
+// =============================================================================
+
+@id("NFR-010")
+quality reliability "System availability" {
+    metric: availability,
+    scale: mean,
+    target: >= 99.95%,
+    constraint: hard,
+    measurement: monthly,
+    verified_by: [
+        monitor "uptime_robot",
+        monitor "pingdom",
+        audit "quarterly_sla_review",
+    ],
+}
+
+@id("NFR-011")
+quality reliability "Error rate" {
+    metric: error_rate,
+    scale: mean,
+    target: < 0.1%,
+    constraint: hard,
+    measurement: hourly,
+    verified_by: [
+        monitor "sentry_error_tracking",
+        test "chaos_engineering_suite",
+    ],
+}
+
+// =============================================================================
+// Complete Security Requirements
+// =============================================================================
+
+@id("NFR-020")
+quality security "Authentication security" {
+    metric: auth_strength,
+    target: >= 2,
+    constraint: hard,
+    applies_to: action create_user,
+    verified_by: [
+        test "security_scan",
+        audit "penetration_test",
+        audit "security_review",
+    ],
+}
+
+@id("NFR-021")
+quality security "Data encryption" {
+    metric: encryption_standard,
+    target: >= 256,
+    constraint: hard,
+    verified_by: [
+        audit "encryption_audit",
+        test "crypto_validation",
+    ],
+}
+
+// =============================================================================
+// Complete Scalability Requirements
+// =============================================================================
+
+@id("NFR-030")
+quality scalability "Horizontal scalability" {
+    metric: max_nodes,
+    target: >= 100,
+    constraint: soft,
+    verified_by: [
+        benchmark "cluster_scale_test",
+        test "auto_scaling_test",
+    ],
+}
+
+@id("NFR-031")
+quality scalability "Peak load handling" {
+    metric: requests_handled,
+    target: >= 50000/s,
+    constraint: hard,
+    under_load: {
+        concurrent_connections: 10000,
+        duration: 1h,
+    },
+    verified_by: [
+        benchmark "stress_test",
+        benchmark "spike_test",
+    ],
+}
+
+// =============================================================================
+// Complete Maintainability Requirements
+// =============================================================================
+
+@id("NFR-040")
+quality maintainability "Code test coverage" {
+    metric: test_coverage,
+    target: >= 80%,
+    constraint: soft,
+    verified_by: [
+        test "coverage_report",
+        audit "code_review",
+    ],
+}
+
+@id("NFR-041")
+quality maintainability "Code quality" {
+    metric: code_quality_score,
+    target: >= 80,
+    constraint: soft,
+    verified_by: [
+        test "sonarqube_analysis",
+        audit "code_review",
+    ],
+}
+
+// =============================================================================
+// Complete Usability Requirements
+// =============================================================================
+
+// Note: Valid scale values are: mean, median, p50, p90, p95, p99, p999, max, min
+@id("NFR-050")
+quality usability "Page load performance" {
+    metric: largest_contentful_paint,
+    scale: p95,
+    target: < 2500ms,
+    constraint: soft,
+    verified_by: [
+        monitor "lighthouse_ci",
+        test "performance_budget_test",
+    ],
+}
+
+// =============================================================================
+// Composite Quality Requirements
+// =============================================================================
+
+@id("NFR-100")
+@rationale("Critical user-facing endpoint requires strict performance")
+quality performance "User creation SLA" {
+    metric: latency,
+    scale: p99,
+    target: < 500ms,
+    constraint: hard,
+    applies_to: action create_user,
+    measurement: per_request,
+    under_load: {
+        concurrent_users: 1000,
+        requests_per_second: 200,
+        duration: 30m,
+    },
+    verified_by: [
+        test "user_creation_load_test",
+        test "user_creation_stress_test",
+        monitor "datadog_user_api",
+        benchmark "user_api_benchmark",
+        audit "monthly_sla_review",
+    ],
+}
+

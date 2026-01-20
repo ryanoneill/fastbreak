@@ -1,0 +1,103 @@
+// Actions
+// Demonstrates: action keyword, parameters, return types
+
+// =============================================================================
+// Supporting Types
+// =============================================================================
+
+type User {
+    id: Int,
+    name: String,
+}
+
+type Item {
+    id: Int,
+    name: String,
+    price: Int,
+}
+
+enum Status {
+    Active,
+    Inactive,
+}
+
+// =============================================================================
+// Supporting State
+// =============================================================================
+
+state System {
+    users: Set<User>,
+    items: Set<Item>,
+    count: Int,
+}
+
+// =============================================================================
+// Actions with No Parameters
+// =============================================================================
+
+// Simple action with no parameters or return
+action reset()
+
+// Another parameterless action
+action clear()
+
+// =============================================================================
+// Actions with Parameters
+// =============================================================================
+
+// Single parameter
+action set_count(n: Int)
+
+// Multiple parameters
+action set_bounds(min: Int, max: Int)
+
+// Parameter with custom type
+action add_user(user: User)
+
+// Multiple typed parameters
+action transfer(from_id: Int, to_id: Int, amount: Int)
+
+// =============================================================================
+// Actions with Return Types
+// =============================================================================
+
+// Return a simple type
+action get_count() -> Int
+
+// Return a boolean
+action is_empty() -> Bool
+
+// Return a custom type
+action get_user(id: Int) -> User
+
+// =============================================================================
+// Actions with Option Return
+// =============================================================================
+
+// Return Option when value may not exist
+action find_user(id: Int) -> Option<User>
+
+action find_item(name: String) -> Option<Item>
+
+// =============================================================================
+// Actions with Result Return
+// =============================================================================
+
+// Return Result for operations that can fail
+action create_user(name: String) -> Result<User, String>
+
+action delete_user(id: Int) -> Result<User, String>
+
+action process_order(item_id: Int, quantity: Int) -> Result<Int, String>
+
+// =============================================================================
+// Complex Actions
+// =============================================================================
+
+// Action with multiple parameters and Result return
+action register(name: String, email: String, age: Int) -> Result<User, String>
+
+// Action returning a collection
+action get_active_users() -> Set<User>
+
+action get_user_ids() -> List<Int>

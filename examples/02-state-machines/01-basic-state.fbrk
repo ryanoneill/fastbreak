@@ -1,0 +1,82 @@
+// Basic State Definitions
+// Demonstrates: state keyword, fields, initial values
+
+// =============================================================================
+// Supporting Types
+// =============================================================================
+
+type User {
+    id: Int,
+    name: String,
+}
+
+type Item {
+    id: Int,
+    name: String,
+    price: Int,
+}
+
+// =============================================================================
+// Simple State
+// =============================================================================
+
+// A state with a single field
+state Counter {
+    count: Int,
+}
+
+// State with multiple fields
+state Position {
+    x: Int,
+    y: Int,
+}
+
+// =============================================================================
+// State with Collections
+// =============================================================================
+
+// State holding a set of users
+state UserRegistry {
+    users: Set<User>,
+    next_id: Int,
+}
+
+// Shopping cart state
+state ShoppingCart {
+    items: Set<Item>,
+    customer_id: Int,
+}
+
+// =============================================================================
+// State with Initial Values
+// =============================================================================
+
+// Fields can have default values
+state AppState {
+    initialized: Bool = false,
+    error_count: Int = 0,
+}
+
+// Counter with bounds
+state BoundedCounter {
+    count: Int = 0,
+    min: Int = 0,
+    max: Int = 100,
+}
+
+// =============================================================================
+// Complex State
+// =============================================================================
+
+// E-commerce system state
+state Store {
+    products: Set<Item>,
+    inventory: Map<Int, Int>,
+    orders: List<Int>,
+}
+
+// Session management state
+state SessionManager {
+    sessions: Map<String, User>,
+    active_count: Int = 0,
+}

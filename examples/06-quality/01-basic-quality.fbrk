@@ -1,0 +1,123 @@
+// Basic Quality Requirements
+// Demonstrates: quality keyword, categories, metrics, targets
+
+// =============================================================================
+// Performance Requirements
+// =============================================================================
+
+// Simple latency requirement
+quality performance "API response time" {
+    metric: latency,
+    target: < 100ms,
+}
+
+// Throughput requirement
+quality performance "Request handling capacity" {
+    metric: throughput,
+    target: >= 1000/s,
+}
+
+// Page load time
+quality performance "Page load time" {
+    metric: time_to_load,
+    target: < 2s,
+}
+
+// Database query performance
+quality performance "Database query time" {
+    metric: query_latency,
+    target: < 50ms,
+}
+
+// =============================================================================
+// Reliability Requirements
+// =============================================================================
+
+// System uptime
+quality reliability "System availability" {
+    metric: availability,
+    target: >= 99.9%,
+}
+
+// Error rate
+quality reliability "Error rate" {
+    metric: error_rate,
+    target: < 0.1%,
+}
+
+// Recovery time
+quality reliability "Recovery time" {
+    metric: mttr,
+    target: < 15m,
+}
+
+// =============================================================================
+// Security Requirements
+// =============================================================================
+
+// Password strength
+quality security "Password requirements" {
+    metric: password_entropy,
+    target: >= 80,
+}
+
+// Session timeout
+quality security "Session management" {
+    metric: session_timeout,
+    target: <= 30m,
+}
+
+// Encryption strength
+quality security "Data encryption" {
+    metric: encryption_bits,
+    target: >= 256,
+}
+
+// =============================================================================
+// Scalability Requirements
+// =============================================================================
+
+// Concurrent users
+quality scalability "Concurrent user support" {
+    metric: concurrent_users,
+    target: >= 10000,
+}
+
+// Data volume
+quality scalability "Data capacity" {
+    metric: max_records,
+    target: >= 1000000,
+}
+
+// =============================================================================
+// Usability Requirements
+// =============================================================================
+
+// Time to interactive
+quality usability "Time to interactive" {
+    metric: time_to_interactive,
+    target: < 3s,
+}
+
+// Mobile responsiveness
+quality usability "Mobile performance" {
+    metric: mobile_score,
+    target: >= 90,
+}
+
+// =============================================================================
+// Maintainability Requirements
+// =============================================================================
+
+// Test coverage
+quality maintainability "Test coverage" {
+    metric: test_coverage,
+    target: >= 80%,
+}
+
+// Code complexity
+quality maintainability "Code complexity" {
+    metric: cyclomatic_complexity,
+    target: <= 10,
+}
+

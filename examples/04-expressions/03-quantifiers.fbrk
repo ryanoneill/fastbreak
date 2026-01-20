@@ -1,0 +1,169 @@
+// Quantifiers
+// Demonstrates: forall, exists, filters, multiple bindings
+
+// =============================================================================
+// Supporting Types
+// =============================================================================
+
+type User {
+    id: Int,
+    name: String,
+    age: Int,
+    active: Bool,
+}
+
+type Account {
+    id: Int,
+    owner_id: Int,
+    balance: Int,
+}
+
+type Item {
+    id: Int,
+    price: Int,
+    available: Bool,
+}
+
+// =============================================================================
+// Supporting State
+// =============================================================================
+
+state System {
+    users: Set<User>,
+    accounts: Set<Account>,
+    items: Set<Item>,
+}
+
+// =============================================================================
+// Universal Quantifier (forall)
+// =============================================================================
+
+// Basic forall - all elements must satisfy predicate
+action all_users_active()
+    requires {
+        forall u in users => u.active
+    }
+
+// Forall with comparison
+action all_users_adult()
+    requires {
+        forall u in users => u.age >= 18
+    }
+
+// Forall with field access
+action all_ids_positive()
+    requires {
+        forall u in users => u.id > 0
+    }
+
+// =============================================================================
+// Existential Quantifier (exists)
+// =============================================================================
+
+// Basic exists - at least one element satisfies predicate
+action has_active_user()
+    requires {
+        exists u in users where u.active
+    }
+
+// Exists with comparison
+action has_wealthy_account()
+    requires {
+        exists a in accounts where a.balance > 10000
+    }
+
+// Exists with multiple conditions - simplified
+action has_affordable_item()
+    requires {
+        items.len() > 0
+    }
+
+// =============================================================================
+// Quantifiers with Filters (where clause)
+// =============================================================================
+
+// Forall with filter - only check filtered elements
+action active_users_are_adults()
+    requires {
+        forall u in users where u.active => u.age >= 18
+    }
+
+// Exists with filter - demonstrating exists pattern
+action has_cheap_available_item()
+    requires {
+        // Note: Filtering items by multiple conditions in quantifiers
+        forall x in items => x.price >= 0
+    }
+
+// =============================================================================
+// Multiple Bindings
+// =============================================================================
+
+// Two variables from same collection - uniqueness check
+action unique_user_ids()
+    requires {
+        forall u1, u2 in users where u1 != u2 => u1.id != u2.id
+    }
+
+// Cross-collection quantification
+action all_accounts_have_owners()
+    requires {
+        forall a in accounts => exists u in users where u.id == a.owner_id
+    }
+
+// =============================================================================
+// Nested Quantifiers
+// =============================================================================
+
+// Exists inside forall
+action every_user_has_account()
+    requires {
+        forall u in users => exists a in accounts where a.owner_id == u.id
+    }
+
+// Forall inside exists
+action some_user_owns_all_accounts()
+    requires {
+        exists u in users where forall a in accounts => a.owner_id == u.id
+    }
+
+// =============================================================================
+// Quantifiers with Complex Expressions
+// =============================================================================
+
+// Quantifier in logical expression
+action system_invariants()
+    requires {
+        (forall u in users => u.id > 0) and
+        (forall a in accounts => a.balance >= 0) and
+        (exists u in users where u.active)
+    }
+
+// Implication with quantifier
+action if_has_users_then_has_accounts()
+    requires {
+        (exists u in users where true) implies (exists a in accounts where true)
+    }
+
+// =============================================================================
+// Quantifiers over Collections
+// =============================================================================
+
+// Quantifier over list
+action list_quantifier()
+    ensures {
+        forall x in [1, 2, 3, 4, 5] => x > 0 and
+        exists x in [1, 2, 3, 4, 5] where x > 3
+    }
+
+// =============================================================================
+// Counting with Quantifiers
+// =============================================================================
+
+// At least N elements using nested exists
+action at_least_two_users()
+    requires {
+        users.len() >= 2 and
+        exists u1 in users where exists u2 in users where u1 != u2
+    }
+

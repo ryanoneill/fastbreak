@@ -1,0 +1,212 @@
+// Literals and Operators
+// Demonstrates: all literal types and operators
+
+// =============================================================================
+// Supporting Types and State
+// =============================================================================
+
+type Value {
+    num: Int,
+    text: String,
+    flag: Bool,
+}
+
+state Calculator {
+    result: Int,
+    memory: Int,
+}
+
+// =============================================================================
+// Integer Literals
+// =============================================================================
+
+action integer_literals()
+    ensures {
+        0 == 0 and
+        42 == 42 and
+        -1 == -1 and
+        1000000 == 1000000
+    }
+
+// =============================================================================
+// Boolean Literals
+// =============================================================================
+
+action boolean_literals()
+    ensures {
+        true == true and
+        false == false and
+        true != false
+    }
+
+// =============================================================================
+// String Literals
+// =============================================================================
+
+action string_literals()
+    ensures {
+        "hello" == "hello" and
+        "world" != "hello"
+    }
+
+// =============================================================================
+// Arithmetic Operators
+// =============================================================================
+
+action arithmetic_operators()
+    ensures {
+        // Addition
+        1 + 2 == 3 and
+        0 + 0 == 0 and
+        -1 + 1 == 0 and
+        // Subtraction
+        5 - 3 == 2 and
+        0 - 1 == -1 and
+        10 - 10 == 0 and
+        // Multiplication
+        3 * 4 == 12 and
+        0 * 100 == 0 and
+        -2 * 3 == -6 and
+        // Division
+        10 / 2 == 5 and
+        15 / 4 == 3 and
+        // Modulo
+        17 % 5 == 2 and
+        10 % 2 == 0 and
+        7 % 3 == 1
+    }
+
+// Operator precedence
+action operator_precedence()
+    ensures {
+        // Multiplication before addition
+        2 + 3 * 4 == 14 and
+        // Parentheses override precedence
+        (2 + 3) * 4 == 20 and
+        // Left-to-right for same precedence
+        10 - 5 - 2 == 3
+    }
+
+// =============================================================================
+// Comparison Operators
+// =============================================================================
+
+action comparison_operators()
+    ensures {
+        // Equality
+        5 == 5 and
+        "hello" == "hello" and
+        // Inequality
+        5 != 6 and
+        "hello" != "world" and
+        // Less than
+        3 < 5 and
+        -1 < 0 and
+        // Less than or equal
+        3 <= 5 and
+        5 <= 5 and
+        // Greater than
+        5 > 3 and
+        0 > -1 and
+        // Greater than or equal
+        5 >= 3 and
+        5 >= 5
+    }
+
+// Chained comparisons
+action chained_comparisons()
+    ensures {
+        // Multiple comparisons with 'and'
+        (1 < 2) and (2 < 3) and
+        (0 <= 5) and (5 <= 10)
+    }
+
+// =============================================================================
+// Logical Operators
+// =============================================================================
+
+action logical_operators()
+    ensures {
+        // AND - both must be true
+        (true and true) and
+        not (true and false) and
+        not (false and true) and
+        not (false and false) and
+        // OR - at least one must be true
+        (true or true) and
+        (true or false) and
+        (false or true) and
+        not (false or false) and
+        // NOT - negation
+        not false and
+        not (not true)
+    }
+
+// Implication
+action implication_operator()
+    ensures {
+        // A implies B is equivalent to (not A) or B
+        (true implies true) and
+        (false implies true) and
+        (false implies false) and
+        not (true implies false) and
+        // Useful for conditional assertions
+        (5 > 3) implies (5 >= 3)
+    }
+
+// =============================================================================
+// Complex Expressions
+// =============================================================================
+
+action complex_expressions()
+    ensures {
+        // Combining arithmetic and comparison
+        (2 + 3 > 4) and (10 - 5 == 5) and
+        // Nested logical expressions
+        ((1 < 2) or (3 < 2)) and (4 == 4) and
+        // Implication with complex conditions
+        (5 > 0) implies (5 * 2 > 0)
+    }
+
+// =============================================================================
+// Field Access
+// =============================================================================
+
+action field_access()
+    ensures {
+        // Access fields of constructed values
+        Value { num: 42, text: "test", flag: true }.num == 42 and
+        Value { num: 42, text: "test", flag: true }.text == "test" and
+        Value { num: 42, text: "test", flag: true }.flag
+    }
+
+// =============================================================================
+// Let Expressions
+// =============================================================================
+
+action let_expressions()
+    ensures {
+        // Simple let binding
+        (let x = 5 in x + 1) == 6 and
+        // Multiple calculations
+        (let a = 10 in let b = 20 in a + b) == 30 and
+        // Let with complex expression
+        (let sum = 1 + 2 + 3 in sum * 2) == 12
+    }
+
+// =============================================================================
+// Conditional Expressions
+// =============================================================================
+
+// if-then-else uses braces: if condition { then_expr } else { else_expr }
+action conditional_expressions()
+    ensures {
+        // If-then-else expression
+        (if true { 1 } else { 2 }) == 1 and
+        (if false { 1 } else { 2 }) == 2 and
+        // Conditional with comparison
+        (if 5 > 3 { "yes" } else { "no" }) == "yes" and
+        // Nested conditionals
+        (if true { if false { 1 } else { 2 } } else { 3 }) == 2
+    }
+

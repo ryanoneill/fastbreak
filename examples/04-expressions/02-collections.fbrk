@@ -1,0 +1,146 @@
+// Collections
+// Demonstrates: sets, lists, maps, tuples, and their operations
+
+// =============================================================================
+// Supporting Types
+// =============================================================================
+
+type Item {
+    id: Int,
+    name: String,
+}
+
+type User {
+    id: Int,
+    name: String,
+}
+
+state Store {
+    items: Set<Item>,
+    ordered_items: List<Item>,
+    inventory: Map<Int, Int>,
+}
+
+// =============================================================================
+// Set Literals and Operations
+// =============================================================================
+
+action set_literals()
+    ensures {
+        // Empty set
+        {}.len() == 0 and
+        // Set with elements
+        {1, 2, 3}.len() == 3 and
+        // Sets eliminate duplicates
+        {1, 1, 2, 2, 3}.len() == 3
+    }
+
+action set_membership()
+    ensures {
+        // Element membership with 'in'
+        1 in {1, 2, 3} and
+        not (4 in {1, 2, 3})
+    }
+
+// Note: union, intersect, difference operators are planned but not yet implemented
+// For now, sets support membership testing, length, and equality
+
+action set_quantifiers()
+    ensures {
+        // Check if all elements satisfy a condition
+        forall x in {1, 2, 3} => x > 0 and
+        // Check if any element satisfies a condition
+        exists x in {1, 2, 3} where x == 2
+    }
+
+action set_comparisons()
+    ensures {
+        // Set equality (order doesn't matter)
+        {1, 2, 3} == {3, 2, 1} and
+        {1, 2} != {1, 2, 3}
+    }
+
+// =============================================================================
+// List Literals and Operations
+// =============================================================================
+
+action list_literals()
+    ensures {
+        // Empty list
+        [].len() == 0 and
+        // List with elements
+        [1, 2, 3].len() == 3 and
+        // Lists preserve duplicates
+        [1, 1, 2, 2, 3].len() == 5 and
+        // Lists preserve order
+        [3, 1, 2] != [1, 2, 3]
+    }
+
+action list_indexing()
+    ensures {
+        // Zero-based indexing
+        [10, 20, 30][0] == 10 and
+        [10, 20, 30][1] == 20 and
+        [10, 20, 30][2] == 30
+    }
+
+// Note: List concatenation (++) operator is planned but not yet implemented
+// Lists support indexing, length, and iteration
+
+action list_methods()
+    ensures {
+        // Lists support length method
+        [1, 2, 3].len() > 0 and
+        // Lists support element equality
+        [1, 2, 3][0] == 1
+    }
+
+// =============================================================================
+// Tuple Expressions
+// =============================================================================
+
+action tuple_literals()
+    ensures {
+        // Pair
+        (1, 2) == (1, 2) and
+        (1, 2) != (2, 1) and
+        // Triple
+        (1, "hello", true) == (1, "hello", true)
+    }
+
+// Note: Tuple element access by index (.0, .1) is not currently supported
+// Tuples are primarily used for grouping values together
+
+action tuple_usage()
+    ensures {
+        // Tuple comparison
+        (10, 20) == (10, 20) and
+        (10, 20) != (20, 10)
+    }
+
+// =============================================================================
+// Collection with Custom Types
+// =============================================================================
+
+action typed_collections()
+    ensures {
+        // Set of custom types
+        { Item { id: 1, name: "A" }, Item { id: 2, name: "B" } }.len() == 2 and
+        // List of custom types
+        [ Item { id: 1, name: "A" }, Item { id: 2, name: "B" } ].len() == 2
+    }
+
+// =============================================================================
+// Nested Collections
+// =============================================================================
+
+action nested_collections()
+    ensures {
+        // Set of sets
+        { {1, 2}, {3, 4} }.len() == 2 and
+        // List of lists
+        [ [1, 2], [3, 4, 5] ].len() == 2 and
+        [ [1, 2], [3, 4, 5] ][0].len() == 2 and
+        [ [1, 2], [3, 4, 5] ][1].len() == 3
+    }
+

@@ -1,0 +1,229 @@
+// Pattern Matching
+// Demonstrates: match expressions, is operator, patterns, guards
+
+// =============================================================================
+// Supporting Types
+// =============================================================================
+
+enum Status {
+    Active,
+    Inactive,
+    Pending,
+    Suspended,
+}
+
+// Tuple-style enum variants use positional types
+enum ApiResult {
+    Success(Int),
+    Failure(String),
+}
+
+enum MaybeInt {
+    SomeInt(Int),
+    NoInt,
+}
+
+enum Color {
+    Red,
+    Green,
+    Blue,
+    Custom(Int, Int, Int),
+}
+
+type User {
+    id: Int,
+    name: String,
+    status: Status,
+}
+
+// =============================================================================
+// Supporting State
+// =============================================================================
+
+state App {
+    users: Set<User>,
+    last_result: ApiResult,
+    current_color: Color,
+}
+
+// =============================================================================
+// Basic Match Expressions
+// =============================================================================
+
+// Match on simple enum
+action match_status(s: Status) -> Bool
+    ensures {
+        result == match s {
+            Active => true,
+            Inactive => false,
+            Pending => false,
+            Suspended => false,
+        }
+    }
+
+// Match returning different types
+action status_to_string(s: Status) -> String
+    ensures {
+        result == match s {
+            Active => "active",
+            Inactive => "inactive",
+            Pending => "pending",
+            Suspended => "suspended",
+        }
+    }
+
+// =============================================================================
+// Match with Data Extraction
+// =============================================================================
+
+// Extract value from variant
+action get_result_value(r: ApiResult) -> Int
+    ensures {
+        result == match r {
+            Success(v) => v,
+            Failure(_) => 0,
+        }
+    }
+
+// Extract and use multiple fields
+action get_custom_red(c: Color) -> Int
+    ensures {
+        result == match c {
+            Red => 255,
+            Green => 0,
+            Blue => 0,
+            Custom(r, _, _) => r,
+        }
+    }
+
+// Extract with named binding
+action get_error_message(r: ApiResult) -> String
+    ensures {
+        result == match r {
+            Success(_) => "",
+            Failure(msg) => msg,
+        }
+    }
+
+// =============================================================================
+// Wildcard Patterns
+// =============================================================================
+
+// Underscore ignores the value
+action is_colorful(c: Color) -> Bool
+    ensures {
+        result == match c {
+            Custom(_, _, _) => true,
+            _ => false,
+        }
+    }
+
+// Catch-all pattern
+action has_value(r: ApiResult) -> Bool
+    ensures {
+        result == match r {
+            Success(_) => true,
+            _ => false,
+        }
+    }
+
+// =============================================================================
+// Pattern Guards
+// =============================================================================
+
+// Match with condition
+action categorize_value(n: Int) -> String
+    ensures {
+        result == match n {
+            x if x < 0 => "negative",
+            0 => "zero",
+            x if x > 0 and x < 10 => "small",
+            x if x >= 10 and x < 100 => "medium",
+            _ => "large",
+        }
+    }
+
+// =============================================================================
+// Is Operator (Type Checking)
+// =============================================================================
+
+// Check variant with 'is'
+action is_success(r: ApiResult) -> Bool
+    ensures {
+        result == (r is Success)
+    }
+
+action is_failure(r: ApiResult) -> Bool
+    ensures {
+        result == (r is Failure)
+    }
+
+// Is with MaybeInt
+action is_some_int(o: MaybeInt) -> Bool
+    ensures {
+        result == (o is SomeInt)
+    }
+
+action is_no_int(o: MaybeInt) -> Bool
+    ensures {
+        result == (o is NoInt)
+    }
+
+// Combined is checks
+action check_both(r: ApiResult, o: MaybeInt) -> Bool
+    ensures {
+        result == (r is Success and o is SomeInt)
+    }
+
+// =============================================================================
+// Match in Expressions
+// =============================================================================
+
+// Match inside arithmetic
+action calculate_score(s: Status) -> Int
+    ensures {
+        result == 100 + match s {
+            Active => 50,
+            Inactive => 0,
+            Pending => 25,
+            Suspended => -25,
+        }
+    }
+
+// =============================================================================
+// Pattern Matching in Scenarios
+// =============================================================================
+
+// Note: Qualified enum construction (ApiResult::Success(42)) is not yet supported
+// Use pattern matching primarily for checking existing values
+
+scenario "Match Result in scenario" {
+    given {
+        // Using a simple enum value for now
+        status = Status::Active
+    }
+    when {
+        is_active = match status {
+            Active => true,
+            _ => false,
+        }
+    }
+    then {
+        is_active
+    }
+}
+
+scenario "Check status variants" {
+    given {
+        status1 = Status::Active
+        status2 = Status::Pending
+    }
+    when {
+        check1 = status1 is Active
+        check2 = status2 is Pending
+    }
+    then {
+        check1 and check2
+    }
+}
+

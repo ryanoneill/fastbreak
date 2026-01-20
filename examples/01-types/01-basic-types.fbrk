@@ -1,0 +1,52 @@
+// Basic Type Definitions
+// Demonstrates: type keyword, fields, built-in types
+
+// =============================================================================
+// Simple Types
+// =============================================================================
+
+// A type with two integer fields
+type Point {
+    x: Int,
+    y: Int,
+}
+
+// A type with various built-in types
+type User {
+    id: Int,
+    name: String,
+    active: Bool,
+}
+
+// =============================================================================
+// Nested Types
+// =============================================================================
+
+// Types can reference other types
+type Rectangle {
+    top_left: Point,
+    bottom_right: Point,
+}
+
+// A more complex example with multiple field types
+type Profile {
+    user: User,
+    location: Point,
+    verified: Bool,
+}
+
+// =============================================================================
+// Types with Collections
+// =============================================================================
+
+// Using built-in generic types
+type Team {
+    name: String,
+    members: Set<User>,
+}
+
+type Document {
+    title: String,
+    authors: List<String>,
+    metadata: Map<String, String>,
+}

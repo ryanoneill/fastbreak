@@ -1,0 +1,93 @@
+// Relations (Alloy-inspired)
+// Demonstrates: relation keyword, constraints
+
+// =============================================================================
+// Basic Type for Relations
+// =============================================================================
+
+type Person {
+    id: Int,
+    name: String,
+}
+
+// =============================================================================
+// Simple Relations
+// =============================================================================
+
+// Basic relation with no constraints
+// "knows" maps a Person to a Set of Persons they know
+relation knows: Person -> Set<Person>
+
+// =============================================================================
+// Symmetric Relations
+// =============================================================================
+
+// If A is friends with B, then B is friends with A
+relation friends: Person -> Set<Person> {
+    symmetric
+}
+
+// Colleagues relation is also symmetric
+relation colleagues: Person -> Set<Person> {
+    symmetric
+}
+
+// =============================================================================
+// Irreflexive Relations
+// =============================================================================
+
+// A person cannot be their own parent
+relation parent_of: Person -> Set<Person> {
+    irreflexive
+}
+
+// A person cannot follow themselves
+relation follows: Person -> Set<Person> {
+    irreflexive
+}
+
+// =============================================================================
+// Transitive Relations
+// =============================================================================
+
+// If A is ancestor of B, and B is ancestor of C, then A is ancestor of C
+relation ancestor_of: Person -> Set<Person> {
+    irreflexive
+    transitive
+}
+
+// Manages relationship (transitive hierarchy)
+relation manages: Person -> Set<Person> {
+    irreflexive
+    transitive
+}
+
+// =============================================================================
+// Reflexive Relations
+// =============================================================================
+
+// Everyone can access themselves
+relation can_access: Person -> Set<Person> {
+    reflexive
+}
+
+// =============================================================================
+// Antisymmetric Relations
+// =============================================================================
+
+// If A reports to B and B reports to A, then A = B (which is prevented by irreflexive)
+relation reports_to: Person -> Set<Person> {
+    irreflexive
+    antisymmetric
+}
+
+// =============================================================================
+// Multiple Constraints
+// =============================================================================
+
+// Sibling relation: symmetric (A sibling of B means B sibling of A)
+// and irreflexive (no one is their own sibling)
+relation sibling_of: Person -> Set<Person> {
+    symmetric
+    irreflexive
+}

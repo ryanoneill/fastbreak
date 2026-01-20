@@ -271,6 +271,24 @@ cd spec
 ../target/release/fastbreak build
 ```
 
+## Examples
+
+The `examples/` directory contains comprehensive examples organized by feature with progressive complexity. These examples serve as both learning material and validation that the language features work correctly.
+
+```
+examples/
+├── 01-types/           # Type definitions, enums, aliases, generics, relations
+├── 02-state-machines/  # States, invariants, actions, contracts
+├── 03-scenarios/       # Given/when/then, assertions, alternatives
+├── 04-expressions/     # Literals, operators, collections, quantifiers, lambdas
+├── 05-properties/      # Basic and temporal properties
+├── 06-quality/         # Non-functional requirements
+├── 07-modules/         # Module declarations and imports
+└── 08-attributes/      # Attributes for traceability
+```
+
+Each section includes a README and multiple `.fbrk` files progressing from basic to advanced usage. Run `fastbreak check examples/<file>.fbrk` to validate any example.
+
 ## Expression Language
 
 Fastbreak includes a rich expression language supporting:
