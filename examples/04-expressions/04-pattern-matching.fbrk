@@ -12,14 +12,14 @@ enum Status {
     Suspended,
 }
 
-// Tuple-style enum variants use positional types
+// Tuple-style enum variants with named fields
 enum ApiResult {
-    Success(Int),
-    Failure(String),
+    Success(value: Int),
+    Failure(message: String),
 }
 
 enum MaybeInt {
-    SomeInt(Int),
+    SomeInt(value: Int),
     NoInt,
 }
 
@@ -27,7 +27,7 @@ enum Color {
     Red,
     Green,
     Blue,
-    Custom(Int, Int, Int),
+    Custom(r: Int, g: Int, b: Int),
 }
 
 type User {

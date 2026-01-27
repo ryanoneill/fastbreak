@@ -121,7 +121,8 @@ scenario "Create and find user" {
 // User Properties
 // =============================================================================
 
-property "No duplicate emails" {
-    forall u1, u2 in users where u1 != u2 => u1.email != u2.email
+// Properties use typed quantifiers, not state field references
+property "User data integrity" {
+    forall u: User => u.id > 0
 }
 

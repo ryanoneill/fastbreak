@@ -398,13 +398,23 @@ impl<'src> Parser<'src> {
             let mut fields = Vec::new();
             let mut idx = 0;
             while !self.check(&Token::RParen) {
-                let ty = self.parse_type_ref()?;
-                let field_span = ty.span;
-                fields.push(Field {
-                    name: Ident::new(format!("{idx}"), field_span),
-                    ty,
-                    span: field_span,
-                });
+                // Check if this looks like a named field (ident followed by colon)
+                let field = if matches!(self.peek(), Some(Token::Ident(_)))
+                    && self.check_ahead(1, &Token::Colon)
+                {
+                    // Named field: parse as name: Type
+                    self.parse_field()?
+                } else {
+                    // Positional field: parse just the type, auto-generate name
+                    let ty = self.parse_type_ref()?;
+                    let field_span = ty.span;
+                    Field {
+                        name: Ident::new(format!("{idx}"), field_span),
+                        ty,
+                        span: field_span,
+                    }
+                };
+                fields.push(field);
                 idx += 1;
                 if !self.check(&Token::RParen) {
                     self.expect(&Token::Comma)?;
@@ -4065,5 +4075,49 @@ mod tests {
             }
             _ => panic!("Expected expression or float value"),
         }
+    }
+
+    #[test]
+    fn test_parse_enum_with_named_tuple_variant() {
+        let spec =
+            parse("enum Result { Success(value: Int), Failure(message: String) }").unwrap();
+        assert_eq!(spec.enums.len(), 1);
+        assert_eq!(spec.enums[0].variants.len(), 2);
+        // Check first variant has named field
+        assert_eq!(
+            spec.enums[0].variants[0].fields[0].name.as_str(),
+            "value"
+        );
+        // Check second variant has named field
+        assert_eq!(
+            spec.enums[0].variants[1].fields[0].name.as_str(),
+            "message"
+        );
+    }
+
+    #[test]
+    fn test_parse_enum_with_mixed_tuple_fields() {
+        let spec = parse("enum Tuple { Pair(Int, second: String) }").unwrap();
+        assert_eq!(spec.enums[0].variants[0].fields[0].name.as_str(), "0");
+        assert_eq!(
+            spec.enums[0].variants[0].fields[1].name.as_str(),
+            "second"
+        );
+    }
+
+    #[test]
+    fn test_parse_enum_with_multiple_named_tuple_fields() {
+        let spec = parse("enum Color { Custom(r: Int, g: Int, b: Int) }").unwrap();
+        let fields = &spec.enums[0].variants[0].fields;
+        assert_eq!(fields[0].name.as_str(), "r");
+        assert_eq!(fields[1].name.as_str(), "g");
+        assert_eq!(fields[2].name.as_str(), "b");
+    }
+
+    #[test]
+    fn test_parse_enum_positional_still_works() {
+        let spec = parse("enum ApiResult { Success(Int), Error(String) }").unwrap();
+        assert_eq!(spec.enums[0].variants[0].fields[0].name.as_str(), "0");
+        assert_eq!(spec.enums[0].variants[1].fields[0].name.as_str(), "0");
     }
 }
