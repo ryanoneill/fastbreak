@@ -50,31 +50,52 @@ type Pixel {
 
 // Result type with success value or error message
 // Note: Ok, Err, Some, None are reserved keywords in Fastbreak
-// Tuple-style variants use positional types: Variant(Type)
+// Tuple-style variants can use named fields: Variant(name: Type)
 enum ApiResult {
-    Success(Int),
-    Failure(String),
+    Success(value: Int),
+    Failure(message: String),
 }
 
 // Option-like enum
 enum MaybeUser {
-    SomeUser(User),
+    SomeUser(user: User),
     NoUser,
 }
 
 // Event with different payload types
-// Multiple tuple fields: Variant(Type1, Type2)
+// Multiple named tuple fields: Variant(name1: Type1, name2: Type2)
 enum Event {
-    Created(Int),
-    Updated(Int, String),
-    Deleted(Int),
+    Created(id: Int),
+    Updated(id: Int, reason: String),
+    Deleted(id: Int),
 }
 
-// Struct-style variants use named fields: Variant { field: Type }
+// Struct-style variants use braces: Variant { field: Type }
 enum Message {
     Text { content: String },
     Data { id: Int, payload: String },
     Empty,
+}
+
+// =============================================================================
+// Positional vs Named Tuple Variants
+// =============================================================================
+
+// Positional tuple variants (fields named "0", "1", etc.)
+enum PositionalResult {
+    Success(Int),
+    Error(String),
+}
+
+// Named tuple variants (explicit field names)
+enum NamedResult {
+    Success(value: Int),
+    Error(message: String),
+}
+
+// Mixed: positional and named in same variant (not recommended, but supported)
+enum MixedFields {
+    Data(Int, label: String),
 }
 
 // Supporting type for events
